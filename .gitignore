@@ -2,6 +2,12 @@
 .env
 
 # c program
+<<<<<<< HEAD
 c/hello
 c/edd
 c/add
+=======
+c/*
+!c/*.c
+!c/lib
+>>>>>>> 2816f33 (20250312)
