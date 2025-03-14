@@ -1,7 +1,7 @@
 # .env
 .env
 
-# c program
+# C program
 c/*
 !c/*.c
 !c/lib
@@ -11,3 +11,11 @@ c/makefile/*.o
 c/meta/*
 !c/meta/*.c
 !c/meta/makefile
+!c/**/*.o
+!c/**/lib/
+!c/**/lib/*.a
+!c/**/lib/*.h
+!c/**/Makefile*
+
+# Java
+**/*.class

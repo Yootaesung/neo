@@ -16,7 +16,6 @@ public class gugudan {
             } else {
                 System.out.println("Insert Number 2~9. Retype again~!!");
             }
-            } while(true);
-     }
+        } while(true);
+    }
 }
-
