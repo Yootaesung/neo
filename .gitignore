@@ -19,3 +19,7 @@ c/meta/*
 
 # Java
 **/*.class
+
+# Scala
+scala/**/project
+scala/**/target
