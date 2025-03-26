@@ -1,0 +1,4 @@
+use test
+
+db.bios.findOne()
+db.bios.count()
