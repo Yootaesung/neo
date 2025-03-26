@@ -23,3 +23,7 @@ c/meta/*
 # Scala
 scala/**/project
 scala/**/target
+
+# python
+python/**/.venv
+python/**/__pycache__/
