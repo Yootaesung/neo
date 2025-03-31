@@ -21,4 +21,28 @@ app.get('/select', async (req, res) => {
     res.send(rows);
 })
 
+// insert data to st_info table
+app.get('/insert', async (req, res) => {
+    const { st_id, name, dept } = req.query;
+    const result = connection.query("insert into st_info values (?, ?, ?)",
+        [st_id, name, dept]);
+    res.redirect('/select');
+})
+
+// update data to st_info table
+app.get('/update', async (req, res) => {
+    const { st_id, name, dept } = req.query;
+    const result = connection.query("update st_info set NAME = ?, DEPT = ? where ST_ID =?",
+        [name, dept, st_id]);
+    res.redirect('/select');
+})
+
+// delete data to st_info table
+app.get('/delete', async (req, res) => {
+    const st_id = req.query.st_id;
+    const result = connection.query("delete from st_info where ST_ID =?",
+        [st_id]);
+    res.redirect('/select');
+})
+
 module.exports = app;
