@@ -2,7 +2,7 @@ const express = require('express');
 const morgan = require('morgan');
 const fs = require('fs');
 const path = require('path');
-const mongoClient = requir('mongodb').MongoClient;
+const mongoClient = require('mongodb').MongoClient;
 
 const app = express();
 app.set('port', process.env.Port || 8000);
@@ -17,11 +17,43 @@ app.get('/', (req, res) => {
 
 app.get('/things', (req, res) => {
     mongoClient.connect(databaseUrl, function (err, client) {
-        if (err !== null) {
+        if (err != null) {
             res.json({'count' : 0})
         } else {
             db = client.db('test');
             db.collection('things').find({}).toArray(function (err, result) {
+                if (err) throw err
+                    console.log('result : ');
+                    console.log(result);
+                    res.json(JSON.stringify(result));
+            })
+        }
+    })
+})
+
+app.get('/emp', (req, res) => {
+    mongoClient.connect(databaseUrl, function (err, client) {
+        if (err != null) {
+            res.json({'count' : 0})
+        } else {
+            db = client.db('test');
+            db.collection('emp').find({}).toArray(function (err, result) {
+                if (err) throw err
+                    console.log('result : ');
+                    console.log(result);
+                    res.json(JSON.stringify(result));
+            })
+        }
+    })
+})
+
+app.get('/primer', (req, res) => {
+    mongoClient.connect(databaseUrl, function (err, client) {
+        if (err != null) {
+            res.json({'count' : 0})
+        } else {
+            db = client.db('test');
+            db.collection('primer').find({}).toArray(function (err, result) {
                 if (err) throw err
                     console.log('result : ');
                     console.log(result);
