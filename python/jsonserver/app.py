@@ -7,7 +7,7 @@ from typing import Optional
 
 app = FastAPI()
 
-base_url = 'http://192.168.1.34:5000/users'
+base_url = 'http://192.168.1.42:5000/users'
 
 @app.get(path='/')
 async def healthCheck():
