@@ -7,18 +7,18 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(express.urlencoded({ extended: true}));
+app.use(express.urlencoded({ extended: true }));
 
 
 app.get('/Hello', (req, res) => {
     res.send('Hello World!!')
 })
 
-// select 
+// select all rows from st_info table
 app.get('/select', async (req, res) => {
-    const [rows, fields] = await pool.query('select *from st_info');
-    console.log(result);
-    // res.send(result);   
+    const [rows, fields] = await pool.query('select * from st_info');
+    console.log(rows);
+    // res.send(result);
     res.writeHead(200);
     var template = `
     <!DOCTYPE html>
@@ -33,14 +33,14 @@ app.get('/select', async (req, res) => {
             <th>ST_ID</th>
             <th>NAME</th>
             <th>DEPT</th>
-        </tr>
+        </tr>   
         `;
-        for (var i=0; i<result.length; i++) {
+        for (var i=0; i<rows.length; i++) {
         template += `
         <tr>
-            <th>${result[i]['st_id']}</th>
-            <th>${result[i]['name']}</th>
-            <th>${result[i]['dept']}</th>
+            <th>${rows[i]['ST_ID']}</th>
+            <th>${rows[i]['NAME']}</th>
+            <th>${rows[i]['DEPT']}</th>
         </tr>
         `;
     }
@@ -55,23 +55,23 @@ app.get('/select', async (req, res) => {
 // insert data to st_info table
 app.get('/insert', async (req, res) => {
     const { st_id, name, dept } = req.query;
-    const result = connection.query("insert into st_info values (?, ?, ?)",
+    const [rows] = await pool.query("insert into st_info values (?, ?, ?)",
         [st_id, name, dept]);
     res.redirect('/select');
 })
 
-// update data to st_info table
+//update data to st_info table
 app.get('/update', async (req, res) => {
     const { st_id, name, dept } = req.query;
-    const result = connection.query("update st_info set NAME = ?, DEPT = ? where ST_ID =?",
+    const [rows] = await pool.query("update st_info set NAME = ?, DEPT = ? where ST_ID = ?",
         [name, dept, st_id]);
     res.redirect('/select');
 })
 
-// delete data to st_info table
+// delete data from st_info table
 app.get('/delete', async (req, res) => {
-    const st_id = req.query.st_id;
-    const result = connection.query("delete from st_info where ST_ID =?",
+    const st_id= req.query.st_id;
+    const [rows] = await pool.query("delete from st_info where ST_ID = ?",
         [st_id]);
     res.redirect('/select');
 })
