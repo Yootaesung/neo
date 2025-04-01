@@ -86,7 +86,7 @@ app.patch('/api/users/update/:id', (req, res) => {
 })
 
 // delete, request body O, response 0
-app.patch('/api/users/delete', (req, res) => {
+app.delete('/api/users/delete', (req, res) => {
     const { id } = req.body;
     const user = users.filter(data => data.id != id);
     res.json({ok: true, users: user})
