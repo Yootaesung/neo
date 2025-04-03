@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Quiz7</title>
+  </head>
+  <body>
+    <h3>객체로 경과 시간 알아내기</h3>
+    <hr>
+    <script>
+      let now = new Date();
+      document.write(`현재 시간 : ${now} <br><br>`);
+      let oldTime = new Date(2022, 7, 1, 9, 0, 0);
+      document.write(`기준 시간 : ${oldTime} <br><br>`);
+      let diff = now - oldTime;
+      document.write(`경과 시간 : ${diff} <br><br>`);
+      
+      let elsed_sec = diff / 1000;
+      let elsed_min = elsed_sec / 60;
+      let elsed_hour = elsed_min / 60;
+      let elsed_day = elsed_hour / 24;
+      
+      document.write(`경과 시간(일) : ${Math.round(elsed_day)} <br><br>`);
+      document.write(`경과 시간(시) : ${Math.round(elsed_hour)} <br><br>`);
+      document.write(`경과 시간(분) : ${Math.round(elsed_min)} <br><br>`);
+      document.write(`경과 시간(초) : ${Math.round(elsed_sec)} <br><br>`);
+    </script>
+  </body>
+</html>
