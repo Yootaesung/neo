@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+
 f = open('out.txt', 'w')
 f.write("This is file is %s \n" % "out.txt")
 f.write("end of file")
+f.close()
 
 f = open('out.txt', 'r')
 line = 1
