@@ -10,15 +10,7 @@ END_YEAR = 2024
 
 # 전국 LAWD_CD 샘플 (실제는 260여개 — 필요하면 전체 제공 가능)
 LAWD_CODES = [
-    "11110",  # 서울 종로구
-    "11140",  # 서울 중구
-    "11170",  # 서울 용산구
-    "11200",  # 서울 성동구
-    "11680",  # 서울 강남구
-    "26110",  # 부산 중구
-    "41135",  # 경기 수원시 장안구
-    "48127",  # 경남 창원시 의창구
-    # ... (원하는 만큼 추가 가능, 전체도 가능)
+    "47290",  # 경북 경산시
 ]
 
 def fetch_data(lawd_cd, year, month):
@@ -71,8 +63,8 @@ def main():
                 sleep(0.3)  # 요청 제한 방지
 
     df = pd.DataFrame(all_data)
-    df.to_csv("apart_trade_all_regions.csv", index=False, encoding="utf-8-sig")
-    print("✅ CSV 저장 완료: apart_trade_all_regions.csv")
+    df.to_csv("apart_trade_gungsan.csv", index=False, encoding="utf-8-sig")
+    print("✅ CSV 저장 완료: apart_trade_gungsan.csv")
 
 if __name__ == "__main__":
     main()
