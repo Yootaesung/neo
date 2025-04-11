@@ -47,6 +47,13 @@ POLICIES = [
     ("2025-01-01", "Policy")
 ]
 
+ELECTIONS = [
+    ("2017-05-09", "Presidential"),
+    ("2020-04-15", "Parliamentary"),
+    ("2022-03-09", "Presidential"),
+    ("2024-04-10", "Parliamentary")
+]
+
 
 def fetch_data(lawd_cd, year, month):
     deal_ymd = f"{year}{month:02d}"
@@ -94,6 +101,7 @@ def run_analysis(station_name, region_name, open_year):
     end_year = open_year + 1
     open_date = datetime(open_year, 3, 1)
     policy_dates = [datetime.strptime(p[0], "%Y-%m-%d") for p in POLICIES]
+    election_dates = [datetime.strptime(e[0], "%Y-%m-%d") for e in ELECTIONS]
 
     all_data = []
     for year in range(start_year, end_year + 1):
@@ -137,8 +145,10 @@ def run_analysis(station_name, region_name, open_year):
     plt.figure(figsize=(10, 5))
     sns.lineplot(data=monthly, x="YearMonth", y="Price(₩10k)")
     plt.axvline(open_date.strftime("%Y-%m"), color="red", linestyle="--", label="Subway Opening")
-    for p in policy_dates:
-        plt.axvline(p.strftime("%Y-%m"), color="blue", linestyle=":", label="Policy" if p == policy_dates[0] else "")
+    for i, p in enumerate(policy_dates):
+        plt.axvline(p.strftime("%Y-%m"), color="blue", linestyle=":", label="Policy" if i == 0 else "")
+    for i, e in enumerate(election_dates):
+        plt.axvline(e.strftime("%Y-%m"), color="green", linestyle="-.", label="Election" if i == 0 else "")
     plt.title(f"{station_name} Monthly Price Trend")
     plt.xticks(rotation=45)
     plt.legend()
