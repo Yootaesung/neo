@@ -43,8 +43,7 @@ SUBWAY_DATA = [
 POLICIES = [
     ("2017-06-19", "Policy"), ("2018-09-13", "Policy"),
     ("2019-12-16", "Policy"), ("2020-06-17", "Policy"),
-    ("2020-07-10", "Policy"), ("2025-01-01", "Policy"),
-    ("2025-01-01", "Policy")
+    ("2020-07-10", "Policy"), ("2025-01-01", "Policy")
 ]
 
 ELECTIONS = [
@@ -54,6 +53,11 @@ ELECTIONS = [
     ("2024-04-10", "Parliamentary")
 ]
 
+INTEREST_RATES = [
+    ("2017-11-30", "Up"), ("2018-11-30", "Up"), ("2019-07-18", "Down"),
+    ("2020-03-16", "Down"), ("2022-01-14", "Up"), ("2022-07-13", "Up"),
+    ("2022-10-12", "Up"), ("2023-01-13", "Up")
+]
 
 def fetch_data(lawd_cd, year, month):
     deal_ymd = f"{year}{month:02d}"
@@ -90,7 +94,6 @@ def fetch_data(lawd_cd, year, month):
         print(f"⚠️ Request failed: {lawd_cd} {deal_ymd} - {e}")
         return []
 
-
 def run_analysis(station_name, region_name, open_year):
     lawd_cd = REGION_TO_LAWD.get(region_name)
     if not lawd_cd:
@@ -101,7 +104,9 @@ def run_analysis(station_name, region_name, open_year):
     end_year = open_year + 1
     open_date = datetime(open_year, 3, 1)
     policy_dates = [datetime.strptime(p[0], "%Y-%m-%d") for p in POLICIES]
-    election_dates = [datetime.strptime(e[0], "%Y-%m-%d") for e in ELECTIONS]
+    election_dates_pres = [datetime.strptime(e[0], "%Y-%m-%d") for e in ELECTIONS if e[1] == "Presidential"]
+    election_dates_parl = [datetime.strptime(e[0], "%Y-%m-%d") for e in ELECTIONS if e[1] == "Parliamentary"]
+    interest_rate_events = [(datetime.strptime(i[0], "%Y-%m-%d"), i[1]) for i in INTEREST_RATES]
 
     all_data = []
     for year in range(start_year, end_year + 1):
@@ -142,21 +147,27 @@ def run_analysis(station_name, region_name, open_year):
     monthly = df.groupby("YearMonth")["Price(₩10k)"].mean().reset_index()
     monthly = monthly.sort_values(by="YearMonth")
 
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(14, 6))
     sns.lineplot(data=monthly, x="YearMonth", y="Price(₩10k)")
     plt.axvline(open_date.strftime("%Y-%m"), color="red", linestyle="--", label="Subway Opening")
     for i, p in enumerate(policy_dates):
         plt.axvline(p.strftime("%Y-%m"), color="blue", linestyle=":", label="Policy" if i == 0 else "")
-    for i, e in enumerate(election_dates):
-        plt.axvline(e.strftime("%Y-%m"), color="green", linestyle="-.", label="Election" if i == 0 else "")
+    for i, e in enumerate(election_dates_pres):
+        plt.axvline(e.strftime("%Y-%m"), color="green", linestyle="-.", label="Presidential" if i == 0 else "")
+    for i, e in enumerate(election_dates_parl):
+        plt.axvline(e.strftime("%Y-%m"), color="lime", linestyle="-.", label="Parliamentary" if i == 0 else "")
+    for i, (d, t) in enumerate(interest_rate_events):
+        color = "black" if t == "Up" else "gray"
+        style = "-" if t == "Up" else "--"
+        plt.axvline(d.strftime("%Y-%m"), color=color, linestyle=style, label=f"Rate {t}" if i == 0 else "")
     plt.title(f"{station_name} Monthly Price Trend")
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=45, ha="right")
     plt.legend()
     plt.tight_layout()
     plt.savefig(f"{station_name}_line.png")
     plt.close()
 
-
 if __name__ == "__main__":
     for year, station, region in SUBWAY_DATA:
         run_analysis(station, region, year)
+
