@@ -6,7 +6,7 @@ import seaborn as sns
 from time import sleep
 from datetime import datetime
 
-plt.rcParams['font.family'] = 'Malgun Gothic'
+plt.rcParams['font.family'] = 'NanumBarunGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
 SERVICE_KEY = "BEnu57CEJvi9WccFDSthV6KhaiqCbVpj111B1/eJno9YkXa7FkB4M3XFu9lGQZTrtDvLk+Xed3pUkxU9+lHQlQ=="
