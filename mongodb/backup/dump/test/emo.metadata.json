@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"comm":{"$numberDouble":"1.0"}},"name":"comm_1","sparse":true}],"uuid":"28b1f5d8eb414a04b953c1835a557042","collectionName":"emo","type":"collection"}

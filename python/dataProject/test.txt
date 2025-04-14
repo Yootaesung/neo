@@ -1,0 +1,14 @@
+This is Testfile.
+This is End of file.
+
+
+## p33_file1.py
+
+#!/usr/bin/env python
+
+f = open('test.txt')
+line = 1
+while line:
+    line = f.readline()
+    print(line)
+f.close()

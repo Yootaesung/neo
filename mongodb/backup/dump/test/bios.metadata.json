@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"ae68ab2034e74c19bce63750cf00c3b7","collectionName":"bios","type":"collection"}
