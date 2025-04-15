@@ -25,7 +25,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_25d960c011276279d55114486a092749 {
+                #map_cc64dae15ec906e08daf164335affed5 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -39,19 +39,19 @@
 <body>
     
     
-            <div class="folium-map" id="map_25d960c011276279d55114486a092749" ></div>
+            <div class="folium-map" id="map_cc64dae15ec906e08daf164335affed5" ></div>
         
 </body>
 <script>
     
     
-            var map_25d960c011276279d55114486a092749 = L.map(
-                "map_25d960c011276279d55114486a092749",
+            var map_cc64dae15ec906e08daf164335affed5 = L.map(
+                "map_cc64dae15ec906e08daf164335affed5",
                 {
                     center: [37.566345, 126.977893],
                     crs: L.CRS.EPSG3857,
                     ...{
-  "zoom": 10,
+  "zoom": 17,
   "zoomControl": true,
   "preferCanvas": false,
 }
@@ -63,7 +63,7 @@
 
         
     
-            var tile_layer_4a97e050911bba10bf4edbcf82077742 = L.tileLayer(
+            var tile_layer_97906704ada627c831467160376842f3 = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 0,
@@ -80,7 +80,68 @@
             );
         
     
-            tile_layer_4a97e050911bba10bf4edbcf82077742.addTo(map_25d960c011276279d55114486a092749);
+            tile_layer_97906704ada627c831467160376842f3.addTo(map_cc64dae15ec906e08daf164335affed5);
         
+    
+            var marker_13a3d3ba6a415a8291f59676d2917cb9 = L.marker(
+                [37.566345, 126.977893],
+                {
+}
+            ).addTo(map_cc64dae15ec906e08daf164335affed5);
+        
+    
+            var icon_4f493d8b747583ba303455c065f763e3 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_723e2040580fe45090b7269abcf950f4 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_9a5775cf9f730a312ea8eda4644476db = $(`<div id="html_9a5775cf9f730a312ea8eda4644476db" style="width: 100.0%; height: 100.0%;">서울특별시청</div>`)[0];
+                popup_723e2040580fe45090b7269abcf950f4.setContent(html_9a5775cf9f730a312ea8eda4644476db);
+            
+        
+
+        marker_13a3d3ba6a415a8291f59676d2917cb9.bindPopup(popup_723e2040580fe45090b7269abcf950f4)
+        ;
+
+        
+    
+    
+                marker_13a3d3ba6a415a8291f59676d2917cb9.setIcon(icon_4f493d8b747583ba303455c065f763e3);
+            
+    
+            var circle_marker_58a70b1b80cac386c4c1f40eb8435f79 = L.circleMarker(
+                [37.5658859, 126.9754788],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 150, "stroke": true, "weight": 3}
+            ).addTo(map_cc64dae15ec906e08daf164335affed5);
+        
+    
+        var popup_5b60e8771cc87065e959c5063d9723b8 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_1fdacd2e2395cb4f81a7c847e474d390 = $(`<div id="html_1fdacd2e2395cb4f81a7c847e474d390" style="width: 100.0%; height: 100.0%;">덕수궁</div>`)[0];
+                popup_5b60e8771cc87065e959c5063d9723b8.setContent(html_1fdacd2e2395cb4f81a7c847e474d390);
+            
+        
+
+        circle_marker_58a70b1b80cac386c4c1f40eb8435f79.bindPopup(popup_5b60e8771cc87065e959c5063d9723b8)
+        ;
+
+        
+    
 </script>
 </html>
