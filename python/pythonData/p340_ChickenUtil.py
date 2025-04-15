@@ -24,7 +24,7 @@ class ChickenStore():
             return None
         else:
             return BeautifulSoup(self.soup, 'html.parser')
-        
+    
     def get_request_url(self):
         request = urllib.request.Request(self.url)
         try:
@@ -44,7 +44,7 @@ class ChickenStore():
         
     def save2Csv(self, result):
         data = pd.DataFrame(result, columns=self.mycolumns)
-        data.to_csv(self.branName + '.csv', encoding=self.myencoding, index=True)
+        data.to_csv(self.brandName + '.csv', encoding=self.myencoding, index=True)
 
     def __init__(self, brandName, url):
         self.brandName = brandName
@@ -52,17 +52,16 @@ class ChickenStore():
 
         self.mycolumns = ['brand', 'store', 'sido', 'gungu', 'address']
 
-        if self.brandName in ['pericana', 'nene', 'cheogajip', 'goobne']:
+        if self.brandName in ['pelicana', 'nene', 'cheogajip', 'goobne']:
             self.mycolumns.append('phone')
         else:
             pass
-
+    
         if self.brandName != 'goobne':
             self.soup = self.get_request_url()
             self.driver = None
         else:
             self.soup = None
-            filepath = 'root/chromedriver/chromdriver'
+            filepath = '/root/chromedriver/chromedriver'
             self.driver = webdriver.Chrome(filepath)
             self.driver.get(self.url)
-            
