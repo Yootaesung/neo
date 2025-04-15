@@ -1,0 +1,19 @@
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+
+driver = webdriver.Chrome()
+print(type(driver))
+print('-' * 50)
+
+print('Go Google~!!')
+url = www.google.com
+driver.get(url)
+
+search_textbook = driver.find_element(By.NAME, 'q')
+
+word = 'selenium'
+search_textbook.send_keys(word)
+search_textbook.submit()
+
+wait = 3
