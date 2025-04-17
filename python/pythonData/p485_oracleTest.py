@@ -34,7 +34,7 @@ try:
         myframe = myseries.unstack(idx)
         print(myframe)
 
-        myseries.plot(kind='bar', rot=0)
+        myframe.plot(kind='barh', rot=0)
         plt.title('3개국 테러 발생 현황')
         plt.xlabel('년도')
         plt.ylabel('발생건수')
