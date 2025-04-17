@@ -2,7 +2,7 @@ import json
 
 data = {'age':30, 'name':'홍길동', 'address':'마포구 공덕동', \
     'broadcast':{
-        'sbs' : 5, 'kbs' : 9, 'mbc' : 11            
+        'sbs' : 5, 'kbs' : 9, 'mbc' : 11
     }
 }
 

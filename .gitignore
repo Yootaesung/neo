@@ -24,10 +24,12 @@ c/meta/*
 scala/**/project
 scala/**/target
 
-# python
+## python
 .idea
+secret.json
 python/**/.venv
 python/**/__pycache__/
+**/ secret.json
 
 ## mongodb
 mongodb/backup

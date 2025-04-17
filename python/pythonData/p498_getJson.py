@@ -6,12 +6,12 @@ def get_Json_data():
     print(type(myfile))
     print(myfile)
     print('-' * 50)
-
+    
     myfile = myfile.read()
     print(type(myfile))
     print(myfile)
     print('-' * 50)
-
+    
     jsondata = json.loads(myfile)
     print(type(jsondata))
     print(jsondata)
@@ -19,15 +19,15 @@ def get_Json_data():
 
     for oneitem in jsondata:
         print(oneitem.keys())
-        print(oneitem.value())
-        print('-' * 50)  
-        kor = float(oneitem['kor'])
-        eng = float(oneitem['eng'])
+        print(oneitem.values())
+        print('-' * 50)
+        kor = float(oneitem['kor']) 
+        eng = float(oneitem['eng']) 
         math = float(oneitem['math'])
         total = kor + eng + math
-        print('국어 : ', kor) 
-        print('영어 : ', eng) 
-        print('수학 : ', math) 
+        print('국어 : ', kor)
+        print('영어 : ', eng)
+        print('수학 : ', math)
         print('총점 : ', total)
         print('-' * 50)
 
@@ -43,7 +43,7 @@ def get_Json_data():
             print('성별 : ', _gender)
         else:
             print('성별 정보가 없습니다.')
-        print('-' * 50)
-
+    print('-' * 50)
+    
 if __name__ == '__main__':
     get_Json_data()
