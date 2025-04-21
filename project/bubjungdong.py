@@ -1,13 +1,28 @@
-from fastapi import FastAPI, Query
-from bson.objectid import ObjectId
+from fastapi import FastAPI, Query, APIRouter
 from database import client
+from typing import List
+from pydantic import BaseModel
 
 app = FastAPI()
 
 mydb = client["bubjungdong"]
 mycol = mydb["bubjungdong"]
 
-@app.get('/getbubjungdong')
+class BubjungdongItem(BaseModel):
+    """법정동 정보"""
+    bubjungdongCode: str
+    bubjungdongName: str
+    exitOrNot: str
+
+class BubjungdongResponse(BaseModel):
+    """법정동 검색 응답"""
+    result: bool
+    resultCount: int
+    results: List[BubjungdongItem]
+
+router = APIRouter()
+
+@router.get('/getbubjungdong')
 async def GetBubjungdong(
     dong: str = Query(
         None,
@@ -24,22 +39,22 @@ async def GetBubjungdong(
     }
     items = list(mycol.find(query, {"_id": 0, "법정동코드": 1, "법정동명": 1, "폐지여부": 1}))
     if items:
-        # 법정동 코드를 앞 5글자만 남기고 결과 반환
-        response_dict = {
-            "result": True,
-            "resultCount": len(items)
-        }
-        
-        for i, item in enumerate(items):
-            code = str(item["법정동코드"])[:5]
-            response_dict[str(i)] = {
-                "bubjungdongCode": code,
-                "bubjungdongName": item["법정동명"],
-                "exitOrNot": item["폐지여부"]
-            }
-        
-        return response_dict
-    return {
-        "result": False,
-        "resultCount": 0
-    }
+        response = BubjungdongResponse(
+            result=True,
+            resultCount=len(items),
+            results=[
+                BubjungdongItem(
+                    bubjungdongCode=str(item["법정동코드"])[:5],
+                    bubjungdongName=item["법정동명"],
+                    exitOrNot=item["폐지여부"]
+                ) for item in items
+            ]
+        )
+        return response
+    return BubjungdongResponse(
+        result=False,
+        resultCount=0,
+        results=[]
+    )
+
+app.include_router(router)

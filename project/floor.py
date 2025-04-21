@@ -1,46 +1,44 @@
-import requests
 import json
-import pandas as pd
-from datetime import datetime
+import requests
 import os.path
 import xml.etree.ElementTree as ET
 from fastapi import FastAPI, Query, APIRouter, Depends
-from pydantic import BaseModel
 from typing import List
+from pydantic import BaseModel
+from datetime import datetime
+from dependencies import get_common_params, update_common_params, CommonParams
 
 BASE_DIR = os.path.dirname(os.path.abspath(os.path.relpath("./")))
 secret_file = os.path.join(BASE_DIR, 'secret.json')
 
-with open(secret_file) as f:
-    secrets = json.loads(f.read())
-
-def get_secret(setting, secrets=secrets):
+def get_secret(setting):
+    """비밀 변수를 가져오는 함수"""
+    with open(secret_file) as f:
+        secrets = json.loads(f.read())
     try:
         return secrets[setting]
     except KeyError:
         errorMsg = "Set the {} environment variable.".format(setting)
         return errorMsg
 
-class ExcluUseArItem(BaseModel):
-    """전용면적 정보"""
-    excluUseAr: str
+class FloorItem(BaseModel):
+    """층수 정보"""
+    floor: str
     tradeCount: int
 
-class ExcluUseArResponse(BaseModel):
-    """전용면적 검색 응답"""
+class FloorResponse(BaseModel):
+    """층수 검색 응답"""
     result: bool
     resultCount: int
-    results: List[ExcluUseArItem]
+    results: List[FloorItem]
     message: str = None
 
 app = FastAPI()
 
 router = APIRouter()
 
-from dependencies import get_common_params, update_common_params, CommonParams
-
-@router.get('/getexcluusear')
-async def GetExcluUseAr(
+@router.get('/getfloor')
+async def GetFloor(
     bubjungdongCode: str = Query(
         None,  # 이전 값이 있으면 선택적
         title="법정동코드",
@@ -53,32 +51,39 @@ async def GetExcluUseAr(
         title="아파트명",
         description="아파트 이름을 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다."
     ),
+    exclusiveArea: str = Query(
+        None,  # 이전 값이 있으면 선택적
+        title="전용면적",
+        description="전용면적을 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다."
+    ),
     common_params: CommonParams = Depends(get_common_params)
 ):
     # 이전 값 사용 또는 새로운 값 적용
     bubjungdongCode = bubjungdongCode or common_params.bubjungdongCode
     apartmentName = apartmentName or common_params.apartmentName
+    exclusiveArea = exclusiveArea or common_params.exclusiveArea
     
-    if not bubjungdongCode or not apartmentName:
-        return ExcluUseArResponse(
+    if not all([bubjungdongCode, apartmentName, exclusiveArea]):
+        return FloorResponse(
             result=False,
             resultCount=0,
             results=[],
-            message="법정동코드와 아파트명이 필요합니다."
+            message="법정동코드, 아파트명, 전용면적이 필요합니다."
         )
     
     # 공통 파라미터 업데이트
     update_common_params(
         common_params,
         bubjungdongCode=bubjungdongCode,
-        apartmentName=apartmentName
+        apartmentName=apartmentName,
+        exclusiveArea=exclusiveArea
     )
     
     url = 'https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev'
     
     # 최근 10년치 데이터를 저장할 리스트
     items = []
-    areas = []
+    floors = []
     
     # 현재 년월 구하기
     current_year = datetime.now().year
@@ -107,12 +112,14 @@ async def GetExcluUseAr(
                 for item in root.findall('.//item'):
                     apt_nm = item.find('aptNm')
                     exclu_area = item.find('excluUseAr')
+                    floor_num = item.find('floor')
                     
-                    if apt_nm is not None and exclu_area is not None:
-                        if apt_nm.text.strip() == apartmentName:
-                            area = exclu_area.text.strip()
-                            if area not in areas:
-                                areas.append(area)
+                    if apt_nm is not None and exclu_area is not None and floor_num is not None:
+                        if (apt_nm.text.strip() == apartmentName and 
+                            exclu_area.text.strip() == exclusiveArea):
+                            floor = floor_num.text.strip()
+                            if floor not in floors:
+                                floors.append(floor)
                             items.append(item)
                                 
             except ET.ParseError as pe:
@@ -122,41 +129,43 @@ async def GetExcluUseAr(
                 print(f"API 요청 실패: {str(e)}")
                 continue
     
-    if not areas:
-        return ExcluUseArResponse(
+    if not floors:
+        return FloorResponse(
             result=False,
             resultCount=0,
             results=[]
         )
     
-    # 전용면적별로 그룹화하여 빈도수 계산
-    area_counts = {}
+    # 층수별로 그룹화하여 빈도수 계산
+    floor_counts = {}
     for item in items:
         apt_nm = item.find('aptNm')
         exclu_area = item.find('excluUseAr')
-        if apt_nm is not None and exclu_area is not None:
-            if apt_nm.text.strip() == apartmentName:
-                area = exclu_area.text.strip()
-                area_counts[area] = area_counts.get(area, 0) + 1
+        floor_num = item.find('floor')
+        if apt_nm is not None and exclu_area is not None and floor_num is not None:
+            if (apt_nm.text.strip() == apartmentName and 
+                exclu_area.text.strip() == exclusiveArea):
+                floor = floor_num.text.strip()
+                floor_counts[floor] = floor_counts.get(floor, 0) + 1
 
     # 빈도수가 높은 순으로 정렬
-    sorted_areas = sorted(
-        areas,
-        key=lambda x: (-area_counts.get(x, 0), float(x))  # 거래수 내림차순, 면적 오름차순
+    sorted_floors = sorted(
+        floors,
+        key=lambda x: (-floor_counts.get(x, 0), int(x))  # 거래수 내림차순, 층수 오름차순
     )
 
-    print("전용면적별 거래수:")  # 디버깅용
-    for area in sorted_areas[:5]:  # 상위 5개만 출력
-        print(f"{area}: {area_counts.get(area, 0)}건")
+    print("층수별 거래수:")  # 디버깅용
+    for floor in sorted_floors[:5]:  # 상위 5개만 출력
+        print(f"{floor}층: {floor_counts.get(floor, 0)}건")
 
-    return ExcluUseArResponse(
+    return FloorResponse(
         result=True,
-        resultCount=len(sorted_areas),
+        resultCount=len(sorted_floors),
         results=[
-            ExcluUseArItem(
-                excluUseAr=area,
-                tradeCount=area_counts.get(area, 0)  # 거래수도 함께 반환
-            ) for area in sorted_areas
+            FloorItem(
+                floor=floor,
+                tradeCount=floor_counts.get(floor, 0)  # 거래수도 함께 반환
+            ) for floor in sorted_floors
         ]
     )
 
