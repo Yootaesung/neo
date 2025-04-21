@@ -134,38 +134,15 @@ async def GetSubwayOpenDate(
 ) -> SubwayResponse:
     """지하철역의 개통일을 조회하는 API"""
     try:
-        # MongoDB 연결 확인
-        try:
-            db_info = client.server_info()
-            print(f"데이터베이스 정보: {db_info}")
-        except Exception as e:
-            print(f"데이터베이스 연결 오류: {str(e)}")
-            raise HTTPException(status_code=500, detail="데이터베이스 연결 오류")
-
-        # 컬렉션 통계 확인
-        try:
-            stats = mycol.count_documents({})
-            print(f"컬렉션 통계: {stats} 문서")
-        except Exception as e:
-            print(f"컬렉션 통계 오류: {str(e)}")
-            raise HTTPException(status_code=500, detail="데이터베이스 조회 오류")
-
-        # 검색 조건 설정
         query = {}
         if station:
-            # 역명이나 지역명에 대해 부분 일치 검색 (대소문자 무시)
             query["$or"] = [
                 {"역명": {"$regex": station, "$options": "i"}},
                 {"위치": {"$regex": station, "$options": "i"}}
             ]
 
-        # 데이터 조회
-        try:
-            cursor = mycol.find(query, {"_id": 0})
-            stations = list(cursor)
-        except Exception as e:
-            print(f"데이터 조회 오류: {str(e)}")
-            raise HTTPException(status_code=500, detail="데이터 조회 오류")
+        cursor = mycol.find(query, {"_id": 0})
+        stations = list(cursor)
 
         if not stations:
             return SubwayResponse(
@@ -175,24 +152,23 @@ async def GetSubwayOpenDate(
                 message="해당하는 역이 없습니다."
             )
 
-        # 결과 생성
         results = []
         for station_data in stations:
-            # 개통일이 8자리 숫자인지 확인
-            open_date = station_data.get("개통일", "").strip()
-            if not open_date.isdigit() or len(open_date) != 8:
+            raw_open_date = station_data.get("개통일", "").strip()
+            formatted_date = ''.join(filter(str.isdigit, raw_open_date))
+
+            if len(formatted_date) != 8:
                 continue
 
             results.append(
                 SubwayItem(
-                    subwayOpenDate=open_date,
+                    subwayOpenDate=formatted_date,
                     subwayName=station_data.get("역명", ""),
                     subwayLocation=station_data.get("위치", ""),
                     subwayLine=station_data.get("소속 노선", "")
                 )
             )
 
-        # 개통일이 유효한 결과가 없는 경우
         if not results:
             return SubwayResponse(
                 result=False,
@@ -207,10 +183,7 @@ async def GetSubwayOpenDate(
             results=results
         )
 
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        print(f"서버 오류: {str(e)}")
         raise HTTPException(status_code=500, detail=f"서버 오류: {str(e)}")
 
 app.include_router(router)
