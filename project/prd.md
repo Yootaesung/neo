@@ -17,3 +17,18 @@
 
 지하철역 개통과 아파트 실거래가의 관계를 분석한 결과를 정리한 문서
 
+## 실행 환경
+
+- Windows 10
+- Python 3.11.1
+- pandas
+- matplotlib
+- seaborn
+- numpy
+- json
+- circular-json
+- requests
+- dotenv
+- pymongo
+
+## 
