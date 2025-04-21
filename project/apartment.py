@@ -42,7 +42,7 @@ async def GetApartmentData(
     bubjungdongCode: str = Query(
         None,  
         title="법정동코드",
-        description="법정동코드 5자리를 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다.",
+        description="법정동코드 5자리를 입력하세요. (위에 bubjungdongCode에서 나온 결과)",
         min_length=5,
         max_length=5
     ),

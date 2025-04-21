@@ -2,11 +2,13 @@ from fastapi import FastAPI, Query, APIRouter
 from database import client
 from typing import List
 from pydantic import BaseModel
+import datetime
 
 app = FastAPI()
 
 mydb = client["bubjungdong"]
 mycol = mydb["bubjungdong"]
+last_search_col = mydb["last_search"]  # 마지막 검색어 저장용 컬렉션
 
 class BubjungdongItem(BaseModel):
     """법정동 정보"""
@@ -39,6 +41,18 @@ async def GetBubjungdong(
     }
     items = list(mycol.find(query, {"_id": 0, "법정동코드": 1, "법정동명": 1, "폐지여부": 1}))
     if items:
+        # 검색 결과가 있으면 마지막 검색어 저장
+        last_search_col.update_one(
+            {"type": "last_dong"},
+            {
+                "$set": {
+                    "dong": dong,
+                    "timestamp": datetime.datetime.now()
+                }
+            },
+            upsert=True
+        )
+        
         response = BubjungdongResponse(
             result=True,
             resultCount=len(items),

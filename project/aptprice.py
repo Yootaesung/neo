@@ -59,7 +59,7 @@ async def GetAptPrice(
     floor: str = Query(
         None,  # 이전 값이 있으면 선택적
         title="층",
-        description="층수를 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다."
+        description="층수를 입력하세요. (위에 floor에서 나온 결과)"
     ),
     common_params: CommonParams = Depends(get_common_params)
 ):
