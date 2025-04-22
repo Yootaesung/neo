@@ -4,9 +4,20 @@ import {
   Button,
   Grid,
   Typography,
-  Autocomplete,
   CircularProgress,
-  Box
+  Box,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import axios from 'axios';
 
@@ -14,16 +25,19 @@ const API_BASE_URL = 'http://192.168.1.42:5000';
 
 function ApartmentSearch() {
   const [loading, setLoading] = useState(false);
-  const [dongOptions, setDongOptions] = useState([]);
-  const [stationOptions, setStationOptions] = useState([]);
-  const [apartmentOptions, setApartmentOptions] = useState([]);
-  const [areaOptions, setAreaOptions] = useState([]);
-  const [floorOptions, setFloorOptions] = useState([]);
+  const [searchResults, setSearchResults] = useState({
+    dong: [],
+    station: [],
+    apartments: [],
+    areas: [],
+    floors: []
+  });
+  const [graphType, setGraphType] = useState('line');
   
-  const [selectedValues, setSelectedValues] = useState({
+  const [searchValues, setSearchValues] = useState({
     dong: '',
-    station: '',
     bubjungdongCode: '',
+    station: '',
     openDate: '',
     apartmentName: '',
     exclusiveArea: '',
@@ -32,102 +46,72 @@ function ApartmentSearch() {
   const [results, setResults] = useState(null);
 
   // 법정동 검색
-  const searchDong = async (searchText) => {
-    if (!searchText || searchText.length < 1) return;
+  const searchDong = async () => {
+    if (!searchValues.dong) return;
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/bubjungdong/getbubjungdong?dong=${encodeURIComponent(searchText)}`);
-      if (response.data && Array.isArray(response.data)) {
-        setDongOptions(response.data);
-      }
+      const response = await axios.get(`http://localhost:8000/bubjungdong/getbubjungdong?dong=${searchValues.dong}`);
+      setSearchResults(prev => ({ ...prev, dong: response.data }));
     } catch (error) {
-      console.error('법정동 검색 오류:', error);
-      setDongOptions([]);
+      console.error('Error fetching dong data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // 역 검색
-  const searchStation = async (searchText) => {
-    if (!searchText || searchText.length < 1) return;
+  const searchStation = async () => {
+    if (!searchValues.station) return;
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/subway/getsubway?station=${encodeURIComponent(searchText)}`);
-      if (response.data && Array.isArray(response.data)) {
-        setStationOptions(response.data);
-      }
+      const response = await axios.get(`http://localhost:8000/subway/getsubway?station=${searchValues.station}`);
+      setSearchResults(prev => ({ ...prev, station: response.data }));
     } catch (error) {
-      console.error('역 검색 오류:', error);
-      setStationOptions([]);
+      console.error('Error fetching station data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // 아파트 검색
   const searchApartments = async () => {
-    const { openDate, bubjungdongCode } = selectedValues;
-    if (!openDate || !bubjungdongCode) return;
-    
+    if (!searchValues.openDate || !searchValues.bubjungdongCode) return;
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/apartment/getapartment`, {
-        params: { openDate, bubjungdongCode }
-      });
-      if (response.data && Array.isArray(response.data)) {
-        setApartmentOptions(response.data);
-        // 이전 선택값들 초기화
-        setSelectedValues(prev => ({
-          ...prev,
-          apartmentName: '',
-          exclusiveArea: '',
-          floor: ''
-        }));
-      }
+      const response = await axios.get(`http://localhost:8000/apartment/getapartment?openDate=${searchValues.openDate}&bubjungdongCode=${searchValues.bubjungdongCode}`);
+      setSearchResults(prev => ({ ...prev, apartments: response.data }));
     } catch (error) {
-      console.error('아파트 검색 오류:', error);
-      setApartmentOptions([]);
+      console.error('Error fetching apartment data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // 전용면적 검색
   const searchAreas = async () => {
-    const { openDate, bubjungdongCode, apartmentName } = selectedValues;
-    if (!openDate || !bubjungdongCode || !apartmentName) return;
-
+    if (!searchValues.openDate || !searchValues.bubjungdongCode || !searchValues.apartmentName) return;
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/excluusear/getexcluusear`, {
-        params: { openDate, bubjungdongCode, apartmentName }
-      });
-      if (response.data && Array.isArray(response.data)) {
-        setAreaOptions(response.data);
-        // 이전 선택값들 초기화
-        setSelectedValues(prev => ({
-          ...prev,
-          exclusiveArea: '',
-          floor: ''
-        }));
-      }
+      const response = await axios.get(`http://localhost:8000/excluusear/getexcluusear?openDate=${searchValues.openDate}&bubjungdongCode=${searchValues.bubjungdongCode}&apartmentName=${searchValues.apartmentName}`);
+      setSearchResults(prev => ({ ...prev, areas: response.data }));
     } catch (error) {
-      console.error('전용면적 검색 오류:', error);
-      setAreaOptions([]);
+      console.error('Error fetching area data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // 층 검색
   const searchFloors = async () => {
-    const { openDate, bubjungdongCode, apartmentName, exclusiveArea } = selectedValues;
-    if (!openDate || !bubjungdongCode || !apartmentName || !exclusiveArea) return;
-
+    if (!searchValues.openDate || !searchValues.bubjungdongCode || !searchValues.apartmentName || !searchValues.exclusiveArea) return;
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/floor/getfloor`, {
-        params: { openDate, bubjungdongCode, apartmentName, exclusiveArea }
-      });
-      if (response.data && Array.isArray(response.data)) {
-        setFloorOptions(response.data);
-        // 이전 선택값들 초기화
-        setSelectedValues(prev => ({
-          ...prev,
-          floor: ''
-        }));
-      }
+      const response = await axios.get(`http://localhost:8000/floor/getfloor?openDate=${searchValues.openDate}&bubjungdongCode=${searchValues.bubjungdongCode}&apartmentName=${searchValues.apartmentName}&exclusiveArea=${searchValues.exclusiveArea}`);
+      setSearchResults(prev => ({ ...prev, floors: response.data }));
     } catch (error) {
-      console.error('층 검색 오류:', error);
-      setFloorOptions([]);
+      console.error('Error fetching floor data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -137,7 +121,7 @@ function ApartmentSearch() {
   const handleSearch = async () => {
     setLoading(true);
     try {
-      const { openDate, bubjungdongCode, apartmentName, exclusiveArea, floor } = selectedValues;
+      const { openDate, bubjungdongCode, apartmentName, exclusiveArea, floor } = searchValues;
       
       const params = {
         openDate,
@@ -148,9 +132,9 @@ function ApartmentSearch() {
       };
 
       const [priceResponse, lineGraphResponse, barChartResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/aptprice/getaptprice`, { params }),
-        axios.get(`${API_BASE_URL}/aptprice/getaptpricelinegraph`, { params }),
-        axios.get(`${API_BASE_URL}/aptprice/getaptpricebarchart`, { params })
+        axios.get(`http://localhost:8000/aptprice/getaptprice?${new URLSearchParams(params)}`),
+        axios.get(`http://localhost:8000/aptprice/getaptpricelinegraph?${new URLSearchParams(params)}`),
+        axios.get(`http://localhost:8000/aptprice/getaptpricebarchart?${new URLSearchParams(params)}`)
       ]);
 
       setResults({
@@ -165,183 +149,415 @@ function ApartmentSearch() {
     }
   };
 
+  const isSearchEnabled = () => {
+    const { openDate, bubjungdongCode, apartmentName, exclusiveArea, floor } = searchValues;
+    return openDate && bubjungdongCode && apartmentName && exclusiveArea && floor;
+  };
+
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        아파트 실거래가 조회
+        아파트 가격 조회
       </Typography>
-      
+
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            options={dongOptions}
-            getOptionLabel={(option) => (option.name || '') + ' (' + (option.code || '') + ')'}
-            onInputChange={(_, value) => {
-              if (value && value.length >= 1) {
-                searchDong(value);
-              }
-            }}
-            onChange={(_, value) => {
-              setSelectedValues(prev => ({
-                ...prev,
-                dong: value?.name || '',
-                bubjungdongCode: value?.code || ''
-              }));
-              if (value?.code) {
-                searchApartments();
-              }
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="법정동 검색"
-                variant="outlined"
-                fullWidth
-                helperText="동 이름을 입력하면 코드가 자동으로 설정됩니다"
-              />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            options={stationOptions}
-            getOptionLabel={(option) => option.name || ''}
-            onInputChange={(_, value) => {
-              if (value && value.length >= 1) {
-                searchStation(value);
-              }
-            }}
-            onChange={(_, value) => {
-              setSelectedValues(prev => ({
-                ...prev,
-                station: value?.name || '',
-                openDate: value?.openDate || ''
-              }));
-              if (value?.openDate) {
-                searchApartments();
-              }
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="지하철역 검색"
-                variant="outlined"
-                fullWidth
-                helperText="역 이름을 입력하면 개통일이 자동으로 설정됩니다"
-              />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <TextField
-            label="개통일"
-            variant="outlined"
-            fullWidth
-            value={selectedValues.openDate}
-            onChange={(e) => setSelectedValues(prev => ({ ...prev, openDate: e.target.value }))}
-            placeholder="YYYYMMDD"
-            helperText="예: 20131221"
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            options={apartmentOptions}
-            getOptionLabel={(option) => option.name || ''}
-            value={apartmentOptions.find(opt => opt.name === selectedValues.apartmentName) || null}
-            onChange={(_, value) => {
-              setSelectedValues(prev => ({
-                ...prev,
-                apartmentName: value?.name || ''
-              }));
-              if (value?.name) {
-                searchAreas();
-              }
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="아파트명"
-                variant="outlined"
-                fullWidth
-                helperText="아파트를 선택하세요"
-              />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            options={areaOptions}
-            getOptionLabel={(option) => option.area || ''}
-            value={areaOptions.find(opt => opt.area === selectedValues.exclusiveArea) || null}
-            onChange={(_, value) => {
-              setSelectedValues(prev => ({
-                ...prev,
-                exclusiveArea: value?.area || ''
-              }));
-              if (value?.area) {
-                searchFloors();
-              }
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="전용면적"
-                variant="outlined"
-                fullWidth
-                helperText="전용면적을 선택하세요"
-              />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Autocomplete
-            options={floorOptions}
-            getOptionLabel={(option) => option.floor || ''}
-            value={floorOptions.find(opt => opt.floor === selectedValues.floor) || null}
-            onChange={(_, value) => {
-              setSelectedValues(prev => ({
-                ...prev,
-                floor: value?.floor || ''
-              }));
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="층"
-                variant="outlined"
-                fullWidth
-                helperText="층을 선택하세요"
-              />
-            )}
-          />
-        </Grid>
-
+        {/* 법정동 검색 */}
         <Grid item xs={12}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleSearch}
-            disabled={loading}
-            fullWidth
-          >
-            {loading ? <CircularProgress size={24} /> : '검색'}
-          </Button>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>법정동 검색</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={9}>
+                <TextField
+                  label="법정동 이름"
+                  value={searchValues.dong}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, dong: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="contained"
+                  onClick={searchDong}
+                  disabled={!searchValues.dong || loading}
+                  fullWidth
+                  sx={{ height: '100%' }}
+                >
+                  검색
+                </Button>
+              </Grid>
+            </Grid>
+            {searchResults.dong.length > 0 && (
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>법정동명</TableCell>
+                      <TableCell>코드</TableCell>
+                      <TableCell>선택</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {searchResults.dong.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{item.name}</TableCell>
+                        <TableCell>{item.code}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => setSearchValues(prev => ({
+                              ...prev,
+                              bubjungdongCode: item.code
+                            }))}
+                          >
+                            선택
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* 지하철역 검색 */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>지하철역 검색</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={9}>
+                <TextField
+                  label="역 이름"
+                  value={searchValues.station}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, station: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="contained"
+                  onClick={searchStation}
+                  disabled={!searchValues.station || loading}
+                  fullWidth
+                  sx={{ height: '100%' }}
+                >
+                  검색
+                </Button>
+              </Grid>
+            </Grid>
+            {searchResults.station.length > 0 && (
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>역명</TableCell>
+                      <TableCell>개통일</TableCell>
+                      <TableCell>선택</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {searchResults.station.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{item.name}</TableCell>
+                        <TableCell>{item.openDate}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => setSearchValues(prev => ({
+                              ...prev,
+                              openDate: item.openDate
+                            }))}
+                          >
+                            선택
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* 아파트 검색 */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>아파트 검색</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="개통일"
+                  value={searchValues.openDate}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, openDate: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="법정동 코드"
+                  value={searchValues.bubjungdongCode}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, bubjungdongCode: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Button
+                  variant="contained"
+                  onClick={searchApartments}
+                  disabled={!searchValues.openDate || !searchValues.bubjungdongCode || loading}
+                  fullWidth
+                  sx={{ height: '100%' }}
+                >
+                  검색
+                </Button>
+              </Grid>
+            </Grid>
+            {searchResults.apartments.length > 0 && (
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>아파트명</TableCell>
+                      <TableCell>선택</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {searchResults.apartments.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{item.name}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => setSearchValues(prev => ({
+                              ...prev,
+                              apartmentName: item.name
+                            }))}
+                          >
+                            선택
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* 전용면적 검색 */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>전용면적 검색</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="개통일"
+                  value={searchValues.openDate}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, openDate: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="법정동 코드"
+                  value={searchValues.bubjungdongCode}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, bubjungdongCode: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="아파트명"
+                  value={searchValues.apartmentName}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, apartmentName: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="contained"
+                  onClick={searchAreas}
+                  disabled={!searchValues.openDate || !searchValues.bubjungdongCode || !searchValues.apartmentName || loading}
+                  fullWidth
+                  sx={{ height: '100%' }}
+                >
+                  검색
+                </Button>
+              </Grid>
+            </Grid>
+            {searchResults.areas.length > 0 && (
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>전용면적</TableCell>
+                      <TableCell>선택</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {searchResults.areas.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{item.area}㎡</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => setSearchValues(prev => ({
+                              ...prev,
+                              exclusiveArea: item.area
+                            }))}
+                          >
+                            선택
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* 층 검색 */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>층 검색</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="개통일"
+                  value={searchValues.openDate}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, openDate: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="법정동 코드"
+                  value={searchValues.bubjungdongCode}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, bubjungdongCode: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  label="아파트명"
+                  value={searchValues.apartmentName}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, apartmentName: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="전용면적"
+                  value={searchValues.exclusiveArea ? `${searchValues.exclusiveArea}㎡` : ''}
+                  onChange={(e) => setSearchValues(prev => ({ ...prev, exclusiveArea: e.target.value }))}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="contained"
+                  onClick={searchFloors}
+                  disabled={!searchValues.openDate || !searchValues.bubjungdongCode || 
+                           !searchValues.apartmentName || !searchValues.exclusiveArea || loading}
+                  fullWidth
+                  sx={{ height: '100%' }}
+                >
+                  검색
+                </Button>
+              </Grid>
+            </Grid>
+            {searchResults.floors.length > 0 && (
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>층</TableCell>
+                      <TableCell>선택</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {searchResults.floors.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{item.floor}층</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => setSearchValues(prev => ({
+                              ...prev,
+                              floor: item.floor
+                            }))}
+                          >
+                            선택
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* 그래프 선택 및 검색 */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>6. 그래프 선택 및 검색</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <FormControl component="fieldset">
+                  <FormLabel component="legend">그래프 종류</FormLabel>
+                  <RadioGroup
+                    row
+                    value={graphType}
+                    onChange={(e) => setGraphType(e.target.value)}
+                  >
+                    <FormControlLabel value="line" control={<Radio />} label="라인 그래프" />
+                    <FormControlLabel value="bar" control={<Radio />} label="바 차트" />
+                    <FormControlLabel value="both" control={<Radio />} label="둘 다 보기" />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSearch}
+                  disabled={loading || !isSearchEnabled()}
+                  fullWidth
+                  sx={{ height: '100%' }}
+                >
+                  검색
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
         </Grid>
       </Grid>
 
       {results && (
-        <Box mt={4}>
-          <Typography variant="h5" gutterBottom>
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>
             검색 결과
           </Typography>
-          
-          {results.lineGraph?.image_url && (
-            <Box mt={2}>
+          {graphType === 'line' && results.lineGraph?.image_url && (
+            <Box sx={{ mt: 2 }}>
               <img 
                 src={`${API_BASE_URL}${results.lineGraph.image_url}`}
                 alt="가격 추이 그래프"
@@ -349,15 +565,36 @@ function ApartmentSearch() {
               />
             </Box>
           )}
-
-          {results.barChart?.image_url && (
-            <Box mt={2}>
+          {graphType === 'bar' && results.barChart?.image_url && (
+            <Box sx={{ mt: 2 }}>
               <img 
                 src={`${API_BASE_URL}${results.barChart.image_url}`}
-                alt="가격 분포 그래프"
+                alt="가격 분포 차트"
                 style={{ maxWidth: '100%' }}
               />
             </Box>
+          )}
+          {graphType === 'both' && (
+            <>
+              {results.lineGraph?.image_url && (
+                <Box sx={{ mt: 2 }}>
+                  <img 
+                    src={`${API_BASE_URL}${results.lineGraph.image_url}`}
+                    alt="가격 추이 그래프"
+                    style={{ maxWidth: '100%' }}
+                  />
+                </Box>
+              )}
+              {results.barChart?.image_url && (
+                <Box sx={{ mt: 2 }}>
+                  <img 
+                    src={`${API_BASE_URL}${results.barChart.image_url}`}
+                    alt="가격 분포 차트"
+                    style={{ maxWidth: '100%' }}
+                  />
+                </Box>
+              )}
+            </>
           )}
         </Box>
       )}
