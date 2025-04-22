@@ -44,25 +44,26 @@ router = APIRouter()
 
 @router.get('/getexcluusear')
 async def GetExcluusear(
+    openDate: str = Query(
+        None,
+        title="개통일",
+        description="지하철 개통일을 8자리 숫자로 입력하세요. (입력하지 않으면 이전에 입력한 값이 자동으로 사용)",
+        min_length=8,
+        max_length=8
+    ),
     bubjungdongCode: str = Query(
         None,
         title="법정동코드",
-        description="법정동코드 5자리를 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다.",
+        description="법정동코드 5자리를 입력하세요. (입력하지 않으면 이전에 입력한 값이 자동으로 사용)",
         min_length=5,
         max_length=5
     ),
     apartmentName: str = Query(
         None,
         title="아파트명",
-        description="아파트 이름을 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다."
+        description="아파트 이름을 입력하세요. (위 apartmentName에 나온 결과 입력)"
     ),
-    openDate: str = Query(
-        None,
-        title="개통일",
-        description="지하철 개통일을 8자리 숫자로 입력하세요. 입력하지 않으면 이전에 입력한 값이 자동으로 사용됩니다.",
-        min_length=8,
-        max_length=8
-    ),
+
     common_params: CommonParams = Depends(get_common_params)
 ):
     try:
