@@ -6,6 +6,7 @@ class CommonParams:
         self.apartmentName = None
         self.exclusiveArea = None
         self.floor = None
+        self.openDate = None  # 개통일 추가
 
 async def get_common_params(request: Request):
     if not hasattr(request.app, 'common_params'):

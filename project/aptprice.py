@@ -2,7 +2,7 @@ import json
 import requests
 import os.path
 import xml.etree.ElementTree as ET
-from fastapi import FastAPI, Query, APIRouter, Depends, HTTPException
+from fastapi import FastAPI, Query, APIRouter, Depends, HTTPException, Response
 from typing import List
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -11,8 +11,19 @@ import matplotlib.dates as mdates
 import numpy as np
 from dependencies import get_common_params, update_common_params, CommonParams
 from database import client
+from fastapi.responses import FileResponse
+import matplotlib.font_manager as fm
+import matplotlib.ticker as ticker
 
-BASE_DIR = os.path.dirname(os.path.abspath(os.path.relpath("./")))
+# 폰트 설정
+plt.rcParams['font.family'] = 'NanumBarunGothic'
+plt.rcParams['axes.unicode_minus'] = False  # 마이너스 기호 깨짐 방지
+
+PRICE_UNIT = 10000000  # 천만원 단위
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # neo 디렉토리
+PROJECT_DIR = os.path.join(BASE_DIR, 'project')  # project 디렉토리
+STATIC_DIR = os.path.join(PROJECT_DIR, 'static')
 secret_file = os.path.join(BASE_DIR, 'secret.json')
 
 def get_secret(setting):
@@ -31,11 +42,8 @@ last_search_col = mydb["last_search"]  # apartment.py와 동일한 컬렉션 사
 
 class AptPriceItem(BaseModel):
     """아파트 가격 정보"""
-    dealYear: str
-    dealMonth: str
+    saleDay: str
     price: int
-    floor: str
-    exclusiveArea: str
 
 class AptPriceResponse(BaseModel):
     """아파트 가격 검색 응답"""
@@ -47,16 +55,11 @@ class AptPriceResponse(BaseModel):
 class LineGraphResponse(BaseModel):
     """선 그래프 응답"""
     result: bool
-    imageUrl: str = None
     message: str = None
 
 class BarChartResponse(BaseModel):
     """막대 그래프 응답"""
     result: bool
-    imageUrl: str = None
-    beforeAvg: float = None
-    afterAvg: float = None
-    changePercent: float = None
     message: str = None
 
 app = FastAPI()
@@ -131,10 +134,10 @@ async def GetAptPrice(
             )
         else:
             # 이전 개통일 확인
-            last_search = last_search_col.find_one({"type": "subway_open_date"})
-            if last_search:
-                openDate = last_search.get("date")
-            
+            last_open_date = last_search_col.find_one({"type": "subway_open_date"})
+            if last_open_date:
+                openDate = last_open_date["date"]
+
         if not openDate:
             return AptPriceResponse(
                 result=False,
@@ -166,7 +169,7 @@ async def GetAptPrice(
             url_with_params = url + params
             
             try:
-                response = requests.get(url_with_params)
+                response = requests.get(url_with_params, timeout=10)  # timeout 추가
                 root = ET.fromstring(response.content)
                 
                 # 디버깅을 위해 첫 번째 item의 모든 필드를 출력
@@ -185,6 +188,7 @@ async def GetAptPrice(
                     price_elem = item.find('dealAmount')
                     year_elem = item.find('dealYear')
                     month_elem = item.find('dealMonth')
+                    day_elem = item.find('dealDay')
                     
                     # 모든 필요한 요소가 존재하는지 확인
                     if all([
@@ -193,7 +197,8 @@ async def GetAptPrice(
                         floor_elem is not None and floor_elem.text,
                         price_elem is not None and price_elem.text,
                         year_elem is not None and year_elem.text,
-                        month_elem is not None and month_elem.text
+                        month_elem is not None and month_elem.text,
+                        day_elem is not None and day_elem.text
                     ]):
                         apt_name = apt_name_elem.text.strip()
                         area = area_elem.text.strip()
@@ -204,15 +209,19 @@ async def GetAptPrice(
                             area == exclusiveArea and 
                             item_floor == floor):
                             
-                            # 거래 금액에서 쉼표 제거하고 정수로 변환
-                            price = int(price_elem.text.strip().replace(',', '')) * 10000  # 만원 단위를 원 단위로 변환
+                            # 날짜 형식 변환 (YYYY-MM-DD)
+                            year = year_elem.text.strip()
+                            month = month_elem.text.strip()
+                            day = day_elem.text.strip()
+                            
+                            sale_date = f"{year}-{int(month):02d}-{int(day):02d}"
+                            
+                            # 가격 변환 (만원 -> 원)
+                            price = int(price_elem.text.strip().replace(',', '')) * 10000
                             
                             results.append(AptPriceItem(
-                                dealYear=year_elem.text.strip(),
-                                dealMonth=month_elem.text.strip(),
-                                price=price,
-                                floor=floor_elem.text.strip(),
-                                exclusiveArea=area_elem.text.strip()
+                                saleDay=sale_date,
+                                price=price
                             ))
                         
             except ET.ParseError as pe:
@@ -221,6 +230,12 @@ async def GetAptPrice(
                 print(f"데이터 처리 오류: {str(e)}")
             except requests.exceptions.RequestException as e:
                 print(f"API 요청 실패: {str(e)}")
+            except Exception as e:  # 더 구체적인 예외 처리 추가
+                print(f"기타 오류: {str(e)}")
+                if not isinstance(e, (ET.ParseError, ValueError, AttributeError, requests.exceptions.RequestException)):
+                    raise
+            except Exception as e:
+                print(f"Error: {str(e)}")
             
             # 다음 달로 이동
             current_date = (current_date.replace(day=1) + timedelta(days=32)).replace(day=1)
@@ -235,7 +250,7 @@ async def GetAptPrice(
 
         # 결과 생성
         # 거래일 기준으로 정렬 (최신순)
-        results.sort(key=lambda x: (int(x.dealYear), int(x.dealMonth)), reverse=True)
+        results.sort(key=lambda x: x.saleDay, reverse=True)
 
         return AptPriceResponse(
             result=True,
@@ -279,22 +294,38 @@ async def get_line_graph(
     common_params: CommonParams = Depends(get_common_params)
 ):
     try:
-        # API 호출을 위한 파라미터 설정
+        # static 디렉토리 생성
+        os.makedirs(STATIC_DIR, exist_ok=True)
+        
+        # 이전 값 사용 또는 새로운 값 적용
         bubjungdongCode = bubjungdongCode or common_params.bubjungdongCode
         apartmentName = apartmentName or common_params.apartmentName
         exclusiveArea = exclusiveArea or common_params.exclusiveArea
         floor = floor or common_params.floor
-        openDate = openDate or common_params.openDate
 
-        if not all([openDate, bubjungdongCode, apartmentName, exclusiveArea, floor]):
+        # 개통일 처리
+        if openDate:
+            # 새로운 개통일이 입력된 경우, MongoDB에 저장
+            last_search_col.update_one(
+                {"type": "subway_open_date"},
+                {"$set": {"date": openDate}},
+                upsert=True
+            )
+        else:
+            # 이전 개통일 가져오기
+            last_open_date = last_search_col.find_one({"type": "subway_open_date"})
+            if last_open_date:
+                openDate = last_open_date["date"]
+
+        # 필수 파라미터 체크
+        if not all([openDate, bubjungdongCode, apartmentName, exclusiveArea]):
             return LineGraphResponse(
                 result=False,
-                message="모든 파라미터가 필요합니다."
+                message="개통일, 법정동코드, 아파트명, 전용면적을 모두 입력해주세요."
             )
 
-        # 공통 파라미터 업데이트
-        update_common_params(
-            common_params,
+        # 파라미터 업데이트
+        update_common_params(common_params, 
             openDate=openDate,
             bubjungdongCode=bubjungdongCode,
             apartmentName=apartmentName,
@@ -325,7 +356,7 @@ async def get_line_graph(
             url_with_params = url + params
             
             try:
-                response = requests.get(url_with_params)
+                response = requests.get(url_with_params, timeout=10)  # timeout 추가
                 root = ET.fromstring(response.content)
                 
                 for item in root.findall('.//item'):
@@ -345,6 +376,16 @@ async def get_line_graph(
                         dates.append(deal_date)
                         prices.append(price)
                         
+            except ET.ParseError as pe:
+                print(f"XML 파싱 오류: {str(pe)}")
+            except (ValueError, AttributeError) as e:
+                print(f"데이터 처리 오류: {str(e)}")
+            except requests.exceptions.RequestException as e:
+                print(f"API 요청 실패: {str(e)}")
+            except Exception as e:  # 더 구체적인 예외 처리 추가
+                print(f"기타 오류: {str(e)}")
+                if not isinstance(e, (ET.ParseError, ValueError, AttributeError, requests.exceptions.RequestException)):
+                    raise
             except Exception as e:
                 print(f"Error: {str(e)}")
             
@@ -385,42 +426,53 @@ async def get_line_graph(
 
         # 그래프 생성
         plt.figure(figsize=(12, 6))
-        plt.plot(filled_dates, filled_prices, '-o', markersize=4)
+        plt.plot(filled_dates, filled_prices, color='blue', linewidth=2)
         
         # 개통일 표시
-        plt.axvline(x=open_date, color='red', linestyle='--', label='개통일')
+        plt.axvline(x=open_date, color='r', linestyle='--', label='개통일')
         
         # x축 설정
         plt.gca().xaxis.set_major_locator(mdates.YearLocator())
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-        
-        # 월별 눈금 추가 (시계 모양)
         plt.gca().xaxis.set_minor_locator(mdates.MonthLocator())
-        plt.grid(True, which='minor', linestyle=':')
         
-        plt.title(f'{apartmentName} {floor}층 거래가격 추이')
-        plt.xlabel('년도')
-        plt.ylabel('거래금액 (원)')
+        # 격자 설정
+        plt.grid(True, which='major', linestyle='-', alpha=0.5)  # 년도 격자선
+        plt.grid(True, which='minor', linestyle=':', alpha=0.3)  # 월 격자선
+        plt.grid(True, axis='y', alpha=0.3)  # y축 격자선
+        
+        # 가격 단위 변환 (천만원)
+        prices_adj = [p / PRICE_UNIT for p in filled_prices]
+        plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f'{x:.1f}'))
+        
+        plt.title(f'{apartmentName}({exclusiveArea}㎡) {floor}층 실거래가 추이')
+        plt.xlabel('날짜')
+        plt.ylabel('실거래가 (단위: 천만원)')
+        
         plt.legend()
         
         # 그래프 저장
-        graph_path = os.path.join(BASE_DIR, 'static', 'linegraph.png')
-        os.makedirs(os.path.dirname(graph_path), exist_ok=True)
+        graph_path = os.path.join(STATIC_DIR, "linegraph.png")
         plt.savefig(graph_path)
         plt.close()
 
-        return LineGraphResponse(
-            result=True,
-            imageUrl="/static/linegraph.png"
-        )
+        # 이미지 파일 직접 반환
+        if os.path.exists(graph_path):
+            return FileResponse(graph_path, media_type="image/png")
+        else:
+            return LineGraphResponse(
+                result=False,
+                message="그래프 생성에 실패했습니다."
+            )
 
     except Exception as e:
+        print(f"Error in get_line_graph: {str(e)}")  # 에러 로깅 추가
         return LineGraphResponse(
             result=False,
             message=str(e)
         )
 
-@router.get('/getaptpricebarchart')
+@router.get('/getaptpricebarchart')  # 엔드포인트 이름 변경
 async def get_bar_chart(
     openDate: str = Query(
         None,
@@ -454,22 +506,38 @@ async def get_bar_chart(
     common_params: CommonParams = Depends(get_common_params)
 ):
     try:
-        # API 호출을 위한 파라미터 설정
+        # static 디렉토리 생성
+        os.makedirs(STATIC_DIR, exist_ok=True)
+        
+        # 이전 값 사용 또는 새로운 값 적용
         bubjungdongCode = bubjungdongCode or common_params.bubjungdongCode
         apartmentName = apartmentName or common_params.apartmentName
         exclusiveArea = exclusiveArea or common_params.exclusiveArea
         floor = floor or common_params.floor
-        openDate = openDate or common_params.openDate
 
-        if not all([openDate, bubjungdongCode, apartmentName, exclusiveArea, floor]):
+        # 개통일 처리
+        if openDate:
+            # 새로운 개통일이 입력된 경우, MongoDB에 저장
+            last_search_col.update_one(
+                {"type": "subway_open_date"},
+                {"$set": {"date": openDate}},
+                upsert=True
+            )
+        else:
+            # 이전 개통일 가져오기
+            last_open_date = last_search_col.find_one({"type": "subway_open_date"})
+            if last_open_date:
+                openDate = last_open_date["date"]
+
+        # 필수 파라미터 체크
+        if not all([openDate, bubjungdongCode, apartmentName, exclusiveArea]):
             return BarChartResponse(
                 result=False,
-                message="모든 파라미터가 필요합니다."
+                message="개통일, 법정동코드, 아파트명, 전용면적을 모두 입력해주세요."
             )
 
-        # 공통 파라미터 업데이트
-        update_common_params(
-            common_params,
+        # 파라미터 업데이트
+        update_common_params(common_params, 
             openDate=openDate,
             bubjungdongCode=bubjungdongCode,
             apartmentName=apartmentName,
@@ -500,7 +568,7 @@ async def get_bar_chart(
             url_with_params = url + params
             
             try:
-                response = requests.get(url_with_params)
+                response = requests.get(url_with_params, timeout=10)  # timeout 추가
                 root = ET.fromstring(response.content)
                 
                 for item in root.findall('.//item'):
@@ -523,6 +591,16 @@ async def get_bar_chart(
                         else:
                             after_prices.append(price)
                         
+            except ET.ParseError as pe:
+                print(f"XML 파싱 오류: {str(pe)}")
+            except (ValueError, AttributeError) as e:
+                print(f"데이터 처리 오류: {str(e)}")
+            except requests.exceptions.RequestException as e:
+                print(f"API 요청 실패: {str(e)}")
+            except Exception as e:  # 더 구체적인 예외 처리 추가
+                print(f"기타 오류: {str(e)}")
+                if not isinstance(e, (ET.ParseError, ValueError, AttributeError, requests.exceptions.RequestException)):
+                    raise
             except Exception as e:
                 print(f"Error: {str(e)}")
             
@@ -535,49 +613,96 @@ async def get_bar_chart(
             )
 
         # 평균 계산
-        before_avg = np.mean(before_prices) if before_prices else 0
-        after_avg = np.mean(after_prices) if after_prices else 0
+        before_mean = np.mean(before_prices) if before_prices else 0
+        after_mean = np.mean(after_prices) if after_prices else 0
         
         # 증감률 계산
-        change_percent = ((after_avg - before_avg) / before_avg * 100) if before_avg > 0 else 0
+        change_percent = ((after_mean - before_mean) / before_mean * 100) if before_mean > 0 else 0
 
         # 그래프 생성
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(10, 6))
         
-        # 막대 그래프
-        x = ['Before', 'After']
-        heights = [before_avg, after_avg]
-        bars = plt.bar(x, heights)
+        # 천만원 단위로 변환
+        before_mean_adj = before_mean / PRICE_UNIT
+        after_mean_adj = after_mean / PRICE_UNIT
         
-        # 막대 위에 값 표시
+        # 막대 그래프 생성 (바 간격 좁힘)
+        bars = plt.bar([0, 0.6], [before_mean_adj, after_mean_adj], 
+                      color=['blue', 'red'], width=0.3)
+        
+        # 축 설정
+        plt.xticks([0, 0.6], ['개통 전', '개통 후'])
+        plt.ylabel('실거래가 (단위: 천만원)')
+        
+        # 막대 위에 값 표시 (천만원 단위, 소수점 1자리)
+        ymin, ymax = plt.ylim()
         for bar in bars:
             height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{height:,.0f}원',
-                    ha='center', va='bottom')
+            plt.text(bar.get_x() + bar.get_width()/2, height + (ymax-ymin)*0.02,  # 바 위에 위치
+                    f'{height:.1f}',
+                    ha='center', va='bottom', fontweight='bold', color='black')
         
-        # 증감률 표시
-        plt.title(f'{apartmentName} {floor}층 평균 거래가격 비교\n(증감률: {change_percent:.1f}%)')
-        plt.ylabel('거래금액 (원)')
+        # 화살표 추가 (개통 전 -> 개통 후)
+        arrow_start = (bars[0].get_x() + bars[0].get_width()/2, before_mean_adj)
+        arrow_end = (bars[1].get_x() + bars[1].get_width()/2, after_mean_adj)
         
-        # y축 단위 조정
-        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: format(int(x), ',')))
+        # 화살표의 곡률 계산
+        rad = 0.2
+        # 화살표 중간점의 실제 y 위치 계산 (곡선 고려)
+        curve_height = abs(arrow_end[0] - arrow_start[0]) * rad
+        if after_mean_adj > before_mean_adj:
+            mid_y = (arrow_start[1] + arrow_end[1]) / 2 + curve_height
+        else:
+            mid_y = (arrow_start[1] + arrow_end[1]) / 2 - curve_height
         
-        # 그래프 저장
-        graph_path = os.path.join(BASE_DIR, 'static', 'barchart.png')
-        os.makedirs(os.path.dirname(graph_path), exist_ok=True)
+        # 화살표 추가
+        plt.annotate(
+            '',  # 화살표만 그리기
+            xy=arrow_end,
+            xytext=arrow_start,
+            arrowprops=dict(
+                arrowstyle='->',
+                color='purple',
+                lw=2,
+                connectionstyle=f'arc3,rad={rad}'
+            )
+        )
+        
+        # 증감률 텍스트 추가 (화살표 곡선 위에 바로 배치)
+        text_offset = (ymax-ymin)*0.03  # 작은 오프셋
+        va_position = 'bottom' if after_mean_adj > before_mean_adj else 'top'
+        text_y = mid_y + text_offset if va_position == 'bottom' else mid_y - text_offset
+        
+        plt.text((arrow_start[0] + arrow_end[0]) / 2, text_y,
+                f'{change_percent:+.1f}%',
+                ha='center',
+                va=va_position,
+                fontweight='bold',
+                color='black')
+        
+        plt.title(f'{apartmentName}({exclusiveArea}㎡) {floor}층 개통 전후 5년간 실거래가 평균')
+        
+        # y축 범위 조정
+        ymin = min(before_mean_adj, after_mean_adj) * 0.8
+        ymax = max(before_mean_adj, after_mean_adj) * 1.2
+        plt.ylim(ymin, ymax)
+        
+        # 이미지 파일 경로 설정
+        graph_path = os.path.join(STATIC_DIR, 'barchart.png')
         plt.savefig(graph_path)
         plt.close()
 
-        return BarChartResponse(
-            result=True,
-            imageUrl="/static/barchart.png",
-            beforeAvg=before_avg,
-            afterAvg=after_avg,
-            changePercent=change_percent
-        )
+        # 이미지 파일 직접 반환
+        if os.path.exists(graph_path):
+            return FileResponse(graph_path, media_type="image/png")
+        else:
+            return BarChartResponse(
+                result=False,
+                message="그래프 생성에 실패했습니다."
+            )
 
     except Exception as e:
+        print(f"Error in get_bar_chart: {str(e)}")  # 에러 로깅 추가
         return BarChartResponse(
             result=False,
             message=str(e)

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pymongo.errors import PyMongoError, OperationFailure
 from dependencies import get_common_params, CommonParams
 from database import client
+from datetime import datetime
 
 class SubwayItem(BaseModel):
     """지하철역 정보"""
@@ -44,6 +45,7 @@ async def GetSubway(
         if not search_term:
             return {
                 "result": False,
+                "resultCount": 0,
                 "message": "검색어를 입력하세요."
             }
 
@@ -77,11 +79,13 @@ async def GetSubway(
         if not results:
             return {
                 "result": False,
+                "resultCount": 0,
                 "message": "검색 결과가 없습니다."
             }
 
         return {
             "result": True,
+            "resultCount": len(results),
             "results": results
         }
         
