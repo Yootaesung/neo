@@ -11,11 +11,9 @@ import matplotlib.dates as mdates
 import numpy as np
 from dependencies import get_common_params, update_common_params, CommonParams
 from database import client
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 import matplotlib.font_manager as fm
 import matplotlib.ticker as ticker
-from uuid import uuid4
-from fastapi.staticfiles import StaticFiles
 
 # 폰트 설정
 plt.rcParams['font.family'] = 'NanumBarunGothic'
@@ -26,12 +24,6 @@ PRICE_UNIT = 10000000  # 천만원 단위
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # neo 디렉토리
 PROJECT_DIR = os.path.join(BASE_DIR, 'project')  # project 디렉토리
 STATIC_DIR = os.path.join(PROJECT_DIR, 'static')
-IMAGE_DIR = os.path.join(STATIC_DIR, 'images')
-
-# 디렉토리가 없으면 생성
-os.makedirs(STATIC_DIR, exist_ok=True)
-os.makedirs(IMAGE_DIR, exist_ok=True)
-
 secret_file = os.path.join(BASE_DIR, 'secret.json')
 
 def get_secret(setting):
@@ -64,20 +56,13 @@ class LineGraphResponse(BaseModel):
     """선 그래프 응답"""
     result: bool
     message: str = None
-    image_url: str = None
 
 class BarChartResponse(BaseModel):
     """막대 그래프 응답"""
     result: bool
     message: str = None
-    image_url: str = None
 
 app = FastAPI()
-
-# 정적 파일 서비스 설정
-IMAGE_DIR = os.path.join(STATIC_DIR, 'images')
-os.makedirs(IMAGE_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 router = APIRouter()
 
@@ -466,15 +451,19 @@ async def get_line_graph(
         
         plt.legend()
         
-        # 이미지 파일 저장
-        image_filename = f"line_graph_{uuid4()}.png"
-        image_path = os.path.join(IMAGE_DIR, image_filename)
-        plt.savefig(image_path, bbox_inches='tight', dpi=300)
+        # 그래프 저장
+        graph_path = os.path.join(STATIC_DIR, "linegraph.png")
+        plt.savefig(graph_path)
         plt.close()
-            
-        # 이미지 URL 생성
-        image_url = f"/static/images/{image_filename}"
-        return LineGraphResponse(result=True, image_url=image_url)
+
+        # 이미지 파일 직접 반환
+        if os.path.exists(graph_path):
+            return FileResponse(graph_path, media_type="image/png")
+        else:
+            return LineGraphResponse(
+                result=False,
+                message="그래프 생성에 실패했습니다."
+            )
 
     except Exception as e:
         print(f"Error in get_line_graph: {str(e)}")  # 에러 로깅 추가
@@ -698,15 +687,19 @@ async def get_bar_chart(
         ymax = max(before_mean_adj, after_mean_adj) * 1.2
         plt.ylim(ymin, ymax)
         
-        # 이미지 파일 저장
-        image_filename = f"bar_chart_{uuid4()}.png"
-        image_path = os.path.join(IMAGE_DIR, image_filename)
-        plt.savefig(image_path, bbox_inches='tight', dpi=300)
+        # 이미지 파일 경로 설정
+        graph_path = os.path.join(STATIC_DIR, 'barchart.png')
+        plt.savefig(graph_path)
         plt.close()
-            
-        # 이미지 URL 생성
-        image_url = f"/static/images/{image_filename}"
-        return BarChartResponse(result=True, image_url=image_url)
+
+        # 이미지 파일 직접 반환
+        if os.path.exists(graph_path):
+            return FileResponse(graph_path, media_type="image/png")
+        else:
+            return BarChartResponse(
+                result=False,
+                message="그래프 생성에 실패했습니다."
+            )
 
     except Exception as e:
         print(f"Error in get_bar_chart: {str(e)}")  # 에러 로깅 추가

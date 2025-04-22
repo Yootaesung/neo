@@ -20,4 +20,3 @@ USERNAME = get_secret("ATLAS_Username")
 PASSWORD = get_secret("ATLAS_Password")
 
 client = mongo_client.MongoClient(f"mongodb+srv://{USERNAME}:{PASSWORD}@{HOSTNAME}")
-
