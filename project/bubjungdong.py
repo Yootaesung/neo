@@ -1,10 +1,29 @@
 from fastapi import FastAPI, Query, APIRouter
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from database import client
 from typing import List
 from pydantic import BaseModel
 import datetime
 
 app = FastAPI()
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 origin 허용
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메소드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
+
+# Static 파일 마운트
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def read_root():
+    return FileResponse("static/index.html")
 
 mydb = client["bubjungdong"]
 mycol = mydb["bubjungdong"]
