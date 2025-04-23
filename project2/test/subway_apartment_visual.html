@@ -62,6 +62,8 @@
       <div id="barTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
       <canvas id="barChart" width="420" height="180" style="display:none;"></canvas>
       <div id="barInfo" style="margin-top:0.5rem;"></div>
+      <div id="barTitleAll" style="font-size:1.1em; font-weight:bold; margin-top:1em;"></div>
+      <div id="barInfoAll" style="margin-bottom:1em;"></div>
     </div>
   </div>
 
@@ -95,9 +97,20 @@
      * - 각 역 이름 옆에 (주소, 개통일) 정보도 함께 표시
      */
     async function searchStations() {
-      // 검색 결과가 있으면 필터 영역 보여주기
-      document.getElementById('filter-section').style.display = 'none';
-      const keyword = document.getElementById('stationInput').value.trim();
+  // 새로운 역 검색 시 필터/그래프 상태 초기화
+  filterEverShown = false;
+  if (lineChartObj) { lineChartObj.destroy(); lineChartObj = null; }
+  if (barChartObj) { barChartObj.destroy(); barChartObj = null; }
+  if (lineChartAllObj) { lineChartAllObj.destroy(); lineChartAllObj = null; }
+  if (barChartAllObj) { barChartAllObj.destroy(); barChartAllObj = null; }
+  // 차트 제목/정보도 모두 초기화
+  document.getElementById('lineTitle').innerText = '';
+  document.getElementById('barTitle').innerText = '';
+  document.getElementById('barInfo').innerHTML = '';
+  document.getElementById('barTitleAll').innerText = '';
+  document.getElementById('barInfoAll').innerHTML = '';
+  document.getElementById('filter-section').style.display = 'none';
+  const keyword = document.getElementById('stationInput').value.trim();
       if (!keyword) {
         // 입력값이 없으면 안내 메시지 출력
         document.getElementById('station-list').innerHTML = '<span style="color:#c00;">지하철명을 입력해 주세요.</span>';
@@ -282,6 +295,18 @@
     }
 
     async function selectStation(idx) {
+  // 새로운 역 선택 시 필터/그래프 상태 초기화
+  filterEverShown = false;
+  if (lineChartObj) { lineChartObj.destroy(); lineChartObj = null; }
+  if (barChartObj) { barChartObj.destroy(); barChartObj = null; }
+  if (lineChartAllObj) { lineChartAllObj.destroy(); lineChartAllObj = null; }
+  if (barChartAllObj) { barChartAllObj.destroy(); barChartAllObj = null; }
+  // 차트 제목/정보도 모두 초기화
+  document.getElementById('lineTitle').innerText = '';
+  document.getElementById('barTitle').innerText = '';
+  document.getElementById('barInfo').innerHTML = '';
+  document.getElementById('barTitleAll').innerText = '';
+  document.getElementById('barInfoAll').innerHTML = '';
   // 역 선택 시에는 filter-section을 직접 제어하지 않음 (renderAll에서만 제어)
   const s = window.stationData[idx];
       selectedStation = s;
@@ -309,6 +334,14 @@
       const dfJson = await dfRes.json();
       allDeals = (dfJson && dfJson.result && dfJson.data) ? dfJson.data : [];
       document.getElementById('loading').style.display = 'none';
+      if (!allDeals.length) {
+        document.getElementById('barTitle').innerText = '';
+        document.getElementById('barTitleAll').innerText = '';
+        document.getElementById('lineTitle').innerText = '데이터가 없습니다.';
+        document.getElementById('deal-list-section').innerHTML = '';
+        document.getElementById('filter-section').style.display = 'none';
+        return;
+      }
       setFilterOptions();
       // startMonth, endMonth 입력란은 삭제되어 더 이상 값 설정 불가. 관련 코드 완전 제거.
       filterAndRender();
