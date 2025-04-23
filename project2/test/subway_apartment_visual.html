@@ -39,6 +39,18 @@
       <label>전용면적: <select id="areaSelect" onchange="onAreaChange()"></select></label>
       <label>층: <select id="floorSelect" onchange="onFloorChange()"></select></label>
     </div>
+    <div style="margin-bottom:0.7rem;">
+      <label>읍면동: <select id="umdSelect" onchange="onUmdChange()"></select></label>
+      <label>도로명: <select id="roadSelect" onchange="onRoadChange()"></select></label>
+    </div>
+    <script>
+      // 필터 활성/비활성 유틸
+      function setFilterEnabled(selId, enabled) {
+        const el = document.getElementById(selId);
+        el.disabled = !enabled;
+        if (!enabled) el.value = '';
+      }
+    </script>
   </section>
   <div id="loading" style="display:none;">데이터 수집 중...</div>
   <div style="display:flex; gap:30px; align-items:flex-start; margin-top:2rem;">
@@ -57,6 +69,7 @@
     let selectedStation = null, openDate = null, lawdCode = null, allDeals = [], filtered = [];
     let lineChartObj = null, barChartObj = null;
     let lineChartAllObj = null, barChartAllObj = null; // 전체 차트 객체
+    let filterEverShown = false; // 한 번이라도 거래 그래프가 그려졌으면 true
     let BAR_YEAR = 3; // 기본값은 3년
     // ======== 초기화 및 필터 이벤트 연결 ========
     window.onload = function() {
@@ -82,8 +95,14 @@
      * - 각 역 이름 옆에 (주소, 개통일) 정보도 함께 표시
      */
     async function searchStations() {
+      // 검색 결과가 있으면 필터 영역 보여주기
+      document.getElementById('filter-section').style.display = 'none';
       const keyword = document.getElementById('stationInput').value.trim();
-      if (!keyword) return;
+      if (!keyword) {
+        // 입력값이 없으면 안내 메시지 출력
+        document.getElementById('station-list').innerHTML = '<span style="color:#c00;">지하철명을 입력해 주세요.</span>';
+        return;
+      }
       document.getElementById('station-list').innerHTML = '검색 중...';
       // API 호출: 역 정보 가져오기
       const res = await fetch(`http://192.168.1.42:5001/subway/getsubway?station=${encodeURIComponent(keyword)}`);
@@ -91,8 +110,11 @@
       const stationList = json.results || [];
       if (!json.result || !stationList.length) {
         document.getElementById('station-list').innerHTML = '<i>검색 결과 없음</i>';
+        document.getElementById('filter-section').style.display = 'none';
         return;
       }
+      // 검색 성공 시에만 필터 영역 표시. 이후에는 절대 숨기지 않음.
+      document.getElementById('filter-section').style.display = 'none'; // 역 검색만으론 숨김 유지
       let html = '';
       stationList.forEach((s, idx) => {
         // 주소와 개통일 정보 표시
@@ -109,7 +131,7 @@
     function unhighlightStation(el) { el.classList.remove('selected'); }
 
     function setFilterOptions() {
-      // 아파트/면적/층 드롭다운 옵션 갱신 (각 항목 옆에 개수, 개수 내림차순)
+      // 아파트/면적/층/읍면동/도로명 드롭다운 옵션 갱신 (각 항목 옆에 개수, 개수 내림차순)
       // 1. 아파트
       const aptCounts = {};
       allDeals.forEach(d => {
@@ -119,25 +141,64 @@
       const aptSel = document.getElementById('aptSelect');
       aptSel.innerHTML = '<option value="">전체</option>' + aptSorted.map(([a, n]) => `<option value="${a}">${a} (${n})</option>`).join('');
 
-      // 2. 면적 (전체 아파트 기준, 개수 표시)
+      // 2. 면적
       const areaCountsInit = {};
       allDeals.forEach(d => {
         areaCountsInit[d.area] = (areaCountsInit[d.area]||0)+1;
       });
       const areaSortedInit = Object.entries(areaCountsInit).sort((a,b)=>b[1]-a[1]);
       document.getElementById('areaSelect').innerHTML = '<option value="">전체</option>' + areaSortedInit.map(([a, n])=>`<option value="${a}">${a}㎡ (${n})</option>`).join('');
-      // 3. 층 (전체 아파트+면적 기준, 개수 표시)
+      // 3. 층
       const floorCountsInit = {};
       allDeals.forEach(d => {
         floorCountsInit[d.floor] = (floorCountsInit[d.floor]||0)+1;
       });
       const floorSortedInit = Object.entries(floorCountsInit).sort((a,b)=>b[1]-a[1]);
       document.getElementById('floorSelect').innerHTML = '<option value="">전체</option>' + floorSortedInit.map(([f, n])=>`<option value="${f}">${f}층 (${n})</option>`).join('');
+
+      // 4. 읍면동(umdNm) - address에서 추출 보완
+      const umdCounts = {};
+      allDeals.forEach(d => {
+        let umd = d.umdNm;
+        // address 예시: '11680 수서동 광평로34길 00035-00000 (799)'
+        if (!umd && d.address) {
+          let parts = d.address.split(' ');
+          if (parts.length > 1) umd = parts[1];
+        }
+        if (umd) umdCounts[umd] = (umdCounts[umd]||0)+1;
+      });
+      const umdSorted = Object.entries(umdCounts).sort((a,b)=>b[1]-a[1]);
+      const umdSel = document.getElementById('umdSelect');
+      umdSel.innerHTML = '<option value="">전체</option>' + umdSorted.map(([u, n])=>`<option value="${u}">${u} (${n})</option>`).join('');
+
+      // 5. 도로명(roadNm) - address에서 추출 보완
+      const roadCounts = {};
+      allDeals.forEach(d => {
+        let road = d.roadNm;
+        // address 예시: '11680 수서동 광평로34길 00035-00000 (799)'
+        if (!road && d.address) {
+          let parts = d.address.split(' ');
+          if (parts.length > 2) road = parts[2];
+        }
+        if (road) roadCounts[road] = (roadCounts[road]||0)+1;
+      });
+      const roadSorted = Object.entries(roadCounts).sort((a,b)=>b[1]-a[1]);
+      const roadSel = document.getElementById('roadSelect');
+      roadSel.innerHTML = '<option value="">전체</option>' + roadSorted.map(([r, n])=>`<option value="${r}">${r} (${n})</option>`).join('');
     }
     function onAptChange() {
+      // 아파트 선택 시 읍면동/도로명은 전체로 초기화
+      document.getElementById('umdSelect').value = '';
+      document.getElementById('roadSelect').value = '';
+      setFilterEnabled('areaSelect', !!document.getElementById('aptSelect').value);
+      setFilterEnabled('floorSelect', !!document.getElementById('aptSelect').value);
       const apt = document.getElementById('aptSelect').value;
       const areaSel = document.getElementById('areaSelect');
-      if (!apt) { areaSel.innerHTML = '<option value="">전체</option>'; onAreaChange(); return; }
+      if (!apt) {
+        areaSel.innerHTML = '<option value="">전체</option>';
+        onAreaChange();
+        return;
+      }
       // 면적별 개수
       const areaCounts = {};
       allDeals.filter(d=>d.apartmentName===apt).forEach(d=>{
@@ -165,19 +226,55 @@
     }
     function onFloorChange() { filterAndRender(); }
     function onMonthChange() { filterAndRender(); }
+    function onUmdChange() {
+      // 읍면동 선택 시 아파트/도로명 초기화
+      document.getElementById('aptSelect').value = '';
+      document.getElementById('roadSelect').value = '';
+      setFilterEnabled('areaSelect', false);
+      setFilterEnabled('floorSelect', false);
+      filterAndRender();
+    }
+    function onRoadChange() {
+      // 도로명 선택 시 아파트/읍면동 초기화
+      document.getElementById('aptSelect').value = '';
+      document.getElementById('umdSelect').value = '';
+      setFilterEnabled('areaSelect', false);
+      setFilterEnabled('floorSelect', false);
+      filterAndRender();
+    }
 
     // 거래 필터링 및 차트/목록 렌더링 함수
     function filterAndRender() {
-      // 기간(month) 필터는 제거됨. 아파트, 면적, 층만 필터 적용
+      // 아파트, 읍면동, 도로명 셋 중 하나만 필터 적용
       let apt = document.getElementById('aptSelect').value;
       let area = document.getElementById('areaSelect').value;
       let floor = document.getElementById('floorSelect').value;
+      let umd = document.getElementById('umdSelect').value;
+      let road = document.getElementById('roadSelect').value;
       filtered = allDeals.filter(d => {
-        let ok = true;
-        if (apt) ok = ok && d.apartmentName === apt;
-        if (area) ok = ok && d.area === area;
-        if (floor) ok = ok && d.floor === floor;
-        return ok;
+        if (apt) {
+          let ok = d.apartmentName === apt;
+          if (area) ok = ok && d.area === area;
+          if (floor) ok = ok && d.floor === floor;
+          return ok;
+        } else if (umd) {
+          // 읍면동: d.umdNm가 없으면 address에서 추출
+          let dUmd = d.umdNm;
+          if (!dUmd && d.address) {
+            let parts = d.address.split(' ');
+            if (parts.length > 1) dUmd = parts[1];
+          }
+          return dUmd === umd;
+        } else if (road) {
+          // 도로명: d.roadNm가 없으면 address에서 추출
+          let dRoad = d.roadNm;
+          if (!dRoad && d.address) {
+            let parts = d.address.split(' ');
+            if (parts.length > 2) dRoad = parts[2];
+          }
+          return dRoad === road;
+        }
+        return true;
       });
       renderAll();
       renderDealList();
@@ -185,8 +282,8 @@
     }
 
     async function selectStation(idx) {
-      document.getElementById('filter-section').style.display = 'none';
-      const s = window.stationData[idx];
+  // 역 선택 시에는 filter-section을 직접 제어하지 않음 (renderAll에서만 제어)
+  const s = window.stationData[idx];
       selectedStation = s;
       let lineStr = s.line ? `${s.line}` : '';
       let road = s.stationRoadAddress ? s.stationRoadAddress : '';
@@ -221,17 +318,14 @@
 
 
     function renderAll() {
-      let showFilter = false;
-      // 로딩 중이면 필터 숨김
-      if (document.getElementById('loading').style.display !== 'none') {
-        showFilter = false;
-      } else if (filtered.length) {
-        showFilter = true;
-      }
-      renderLineChart();
-      renderBarChart();
-      document.getElementById('filter-section').style.display = showFilter ? 'block' : 'none';
-    }
+  // 한 번이라도 거래 데이터가 있으면 filterEverShown 유지
+  if (filtered.length > 0) filterEverShown = true;
+  renderLineChart();
+  renderBarChart();
+  // filterEverShown이 true면 무조건 필터 표시
+  document.getElementById('filter-section').style.display = filterEverShown ? 'block' : 'none';
+}
+
     function renderDealList() {
       // 거래내역 테이블, 역명 포함시 <mark> 강조
       let html = '';
@@ -375,10 +469,7 @@
     document.getElementById('lineChart').style.display = '';
     // 제목
     let name = selectedStation ? selectedStation.stationName : '';
-    let addrStr = selectedStation && selectedStation.stationRoadAddress ? `주소 : ${selectedStation.stationRoadAddress}` : '';
-    let openStr = selectedStation && selectedStation.openDate ? `개통일 : ${selectedStation.openDate}` : '';
-    let infoStr = [addrStr, openStr].filter(Boolean).join(', ');
-    document.getElementById('lineTitle').innerText = name + (infoStr ? ` (${infoStr})` : '') + " 인근 아파트 실거래가 변화 추세";
+    document.getElementById('lineTitle').innerText = name + " 인근 아파트 실거래가 변화 추세";
   } catch (err) {
     alert('차트 렌더링 오류: ' + err);
     console.error('[renderLineChart] Chart.js error:', err);
@@ -429,10 +520,7 @@
         document.getElementById('barChart').style.display = '';
         // 제목
         let name = selectedStation ? selectedStation.stationName : '';
-        let addrStr = selectedStation && selectedStation.stationRoadAddress ? `주소 : ${selectedStation.stationRoadAddress}` : '';
-        let openStr = selectedStation && selectedStation.openDate ? `개통일 : ${selectedStation.openDate}` : '';
-        let infoStr = [addrStr, openStr].filter(Boolean).join(', ');
-        document.getElementById('barTitle').innerText = name + (infoStr ? ` (${infoStr})` : '') + ` 개통 전후 ${BAR_YEAR}년 평균 실거래가`;
+        document.getElementById('barTitle').innerText = name + ` 개통 전후 ${BAR_YEAR}년 평균 실거래가`;
         // 증감률
         let percent = (avgBefore && avgAfter) ? (((avgAfter-avgBefore)/avgBefore*100).toFixed(1)+'%') : 'N/A';
         document.getElementById('barInfo').innerHTML = `<span class="bar-label">개통 전후 ${BAR_YEAR}년 평균 증감률:</span> <span class="percent">${percent}</span>`;
