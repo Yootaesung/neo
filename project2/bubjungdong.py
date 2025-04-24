@@ -24,7 +24,7 @@ class BubjungdongItem(BaseModel):
 
 app = FastAPI()
 router = APIRouter()
-routeurl = "http://localhost:5001/bubjungdong/getbubjungdongcode"
+routeurl = "http://localhost:8000/bubjungdong/getbubjungdongcode"
 
 @router.get('/getbubjungdongcode')
 async def GetBubjungdongCode(

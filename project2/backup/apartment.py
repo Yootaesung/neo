@@ -40,7 +40,7 @@ class ApartmentResponse(BaseModel):
 # 내부 함수: 위치(행정구역명)로부터 법정동코드 조회
 import httpx
 async def get_bubjungdong_code(location: str) -> str:
-    url = "http://localhost:5001/bubjungdong/getbubjungdongcode"
+    url = "http://localhost:8000/bubjungdong/getbubjungdongcode"
     params = {"location": location}
     async with httpx.AsyncClient() as client:
         resp = await client.get(url, params=params)

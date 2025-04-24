@@ -66,7 +66,7 @@ async def GetSubway(
                                 formatted_date = ""
             # 위치(행정구역명)로 법정동코드 조회
             try:
-                url = "http://localhost:5001/bubjungdong/getbubjungdongcode"
+                url = "http://localhost:8000/bubjungdong/getbubjungdongcode"
                 params = {"location": doc["위치"]}
                 bubjungdongCode = None
                 async with httpx.AsyncClient() as async_client:
@@ -82,7 +82,8 @@ async def GetSubway(
                 "stationName": doc["역명"],
                 "location": doc["위치"],
                 "openDate": formatted_date,
-                "bubjungdongCode": bubjungdongCode
+                "bubjungdongCode": bubjungdongCode,
+                "stationRoadAddress": doc.get("역사도로명주소", "")
             })
         return {
             "result": bool(results),

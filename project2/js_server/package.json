@@ -1,0 +1,19 @@
+{
+  "name": "project2-js-server",
+  "version": "1.0.0",
+  "description": "Express-based API server (Python -> JS migration)",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js",
+    "pm2": "pm2 start app.js --name js_server --watch"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "mongoose": "^8.3.5"
+  },
+  "devDependencies": {
+    "pm2": "^6.0.5"
+  }
+}
