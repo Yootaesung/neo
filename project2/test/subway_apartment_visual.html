@@ -2,13 +2,15 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>지하철-아파트 실거래가 시각화</title>
+  <title>아파트 실거래가</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
+    body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; text-align: left; }
     #search-section, #filter-section { margin-bottom: 1.5rem; }
+    #filter-section { text-align: left; }
+    #filter-section > div, #filter-section label { text-align: left; display: inline-block; }
     #station-list { margin-top: 0.5rem; }
     .station-item { cursor: pointer; padding: 0.3rem 1rem; border-radius: 5px; margin: 0.2rem 0; }
     .station-item:hover, .station-item.selected { background: #e4f0ff; color: #1357b7; }
@@ -18,30 +20,38 @@
   </style>
 </head>
 <body>
-  <h1>지하철-아파트 실거래가 시각화</h1>
+  <h1>아파트 실거래가</h1>
   <section id="search-section">
-    <label>지하철명: <input type="text" id="stationInput" autocomplete="off" autofocus></label>
-    <button id="searchBtn" type="button">검색</button>
-    <div id="station-list" style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:6px; margin-top:0.7rem; margin-bottom:1.2rem; min-width:260px; background:#fafcff;"></div>
+    <button id="toggle-station-list" type="button" style="font-size:0.95em; margin-bottom:0.3em; display:none;">▼ 검색 결과 접기</button>
+    <div id="station-search-wrap">
+      <label>지하철명: <input type="text" id="stationInput" autocomplete="off" autofocus></label>
+      <button id="searchBtn" type="button">검색</button>
+      <div style="margin-top:0.7rem; margin-bottom:1.2rem;">
+        <div id="station-list" style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:6px; min-width:260px; background:#fafcff;"></div>
+      </div>
+    </div>
   </section>
   <section id="filter-section" style="margin-bottom:1.5rem; display:none;">
-    <div style="margin-bottom:0.7rem;">
-      <label>기간: 
-        <select id="yearRangeSelect">
-          <option value="1">1년</option>
-          <option value="2">2년</option>
-          <option value="3" selected>3년</option>
-        </select>
-      </label>
-    </div>
-    <div style="margin-bottom:0.7rem;">
-      <label>아파트: <select id="aptSelect" onchange="onAptChange()"></select></label>
-      <label>전용면적: <select id="areaSelect" onchange="onAreaChange()"></select></label>
-      <label>층: <select id="floorSelect" onchange="onFloorChange()"></select></label>
-    </div>
-    <div style="margin-bottom:0.7rem;">
-      <label>읍면동: <select id="umdSelect" onchange="onUmdChange()"></select></label>
-      <label>도로명: <select id="roadSelect" onchange="onRoadChange()"></select></label>
+    <button id="toggle-filter-section" type="button" style="font-size:0.95em; margin-bottom:0.3em; display:none;">▼ 필터 접기</button>
+    <div id="filter-content">
+      <div style="margin-bottom:0.7rem;">
+        <label>기간: 
+          <select id="yearRangeSelect">
+            <option value="1">1년</option>
+            <option value="2">2년</option>
+            <option value="3" selected>3년</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-bottom:0.7rem;">
+        <label>아파트: <select id="aptSelect" onchange="onAptChange()"></select></label>
+        <label>전용면적: <select id="areaSelect" onchange="onAreaChange()"></select></label>
+        <label>층: <select id="floorSelect" onchange="onFloorChange()"></select></label>
+      </div>
+      <div style="margin-bottom:0.7rem;">
+        <label>읍면동: <select id="umdSelect" onchange="onUmdChange()"></select></label>
+        <label>도로명: <select id="roadSelect" onchange="onRoadChange()"></select></label>
+      </div>
     </div>
     <script>
       // 필터 활성/비활성 유틸
@@ -52,34 +62,143 @@
       }
     </script>
   </section>
-  <div id="loading" style="display:none;">데이터 수집 중...</div>
-  <div style="display:flex; gap:30px; align-items:flex-start; margin-top:2rem;">
-    <div style="flex:1; min-width:400px;">
-      <div id="lineTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
-      <canvas id="lineChart" width="420" height="320" style="display:none;"></canvas>
+  <script>
+    // Collapsible logic
+    function setCollapsible(id, btnId, defaultOpen, labelOpen, labelClose) {
+  // id: section(전체), btnId: 토글 버튼 id
+  // 버튼은 항상 보이도록 하고, section 내부의 filter-content 또는 station-search-wrap만 숨김/표시
+  const section = document.getElementById(id);
+  const btn = document.getElementById(btnId);
+  let content = null;
+  if (section.id === 'search-section') {
+    content = section.querySelector('#station-search-wrap');
+  } else if (section.id === 'filter-section') {
+    content = section.querySelector('#filter-content');
+  }
+  let open = defaultOpen;
+  function update() {
+    if (open) {
+      if (content) content.style.display = '';
+      btn.innerText = '▼ ' + labelClose;
+    } else {
+      if (content) content.style.display = 'none';
+      btn.innerText = '▲ ' + labelOpen;
+    }
+    btn.style.display = '';
+  }
+  btn.onclick = function() {
+    open = !open;
+    update();
+  };
+  update();
+  return function(expand) { open = expand; update(); };
+}
+    // These will be set after first graph render
+    let expandStationList = null, expandFilterSection = null;
+    // After successful search & graph render, call this:
+    function showCollapsiblesAfterGraph() {
+      // 버튼 보이게
+      document.getElementById('toggle-station-list').style.display = '';
+      document.getElementById('toggle-filter-section').style.display = '';
+      if (!expandStationList) expandStationList = setCollapsible('search-section', 'toggle-station-list', false, '검색 결과 펼치기', '검색 결과 접기');
+      if (!expandFilterSection) expandFilterSection = setCollapsible('filter-section', 'toggle-filter-section', false, '필터 펼치기', '필터 접기');
+      // 기본값(접힘) 상태로 유지
+      // (펼치지 않음)
+    }
+    // 예시: showCollapsiblesAfterGraph()를 그래프 출력 직후 호출 필요
+  </script>
+  <div id="loading" style="display:none;"></div>
+  <div id="loading-gif-container" style="text-align:center; margin-bottom:1.5rem;">
+    <img id="subwayGif" src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmkydTYyN3Bjcnp1bWhtNDhuMWhmNXlvbDIwcmo3ajl0ejVpZHgwMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TlK63EDww4g4tXUd0gE/giphy.gif" style="display:none; width:100px;">
+    <img id="aptGif" src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWFkYmd0dnltZ3Jtd2lvdW5wZXU0N2RpaDB1aThuaTRleGZmc282NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2tRloUSmjNugV9morX/giphy.gif" style="display:none; width:100px;">
+  </div>
+  <div style="display:flex; flex-direction:column; align-items:center; margin-top:2rem;">
+    <div id="graphBtnWrap" style="margin-bottom:1.2rem; display:none;">
+      <button id="showLineBtn" type="button" style="margin-right:10px;">역 인근 실거래가 변화 추세</button>
+      <button id="showBarBtn" type="button">개통 전 후 평균 실거래가</button>
     </div>
-    <div style="flex:1; min-width:400px;">
-      <div id="barTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
-      <canvas id="barChart" width="420" height="180" style="display:none;"></canvas>
-      <div id="barInfo" style="margin-top:0.5rem;"></div>
-      <div id="barTitleAll" style="font-size:1.1em; font-weight:bold; margin-top:1em;"></div>
-      <div id="barInfoAll" style="margin-bottom:1em;"></div>
+    <div id="graphArea" style="width:100%; max-width:800px; min-height:340px;">
+      <div id="lineGraphWrap" style="display:none;">
+        <div id="lineTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
+        <canvas id="lineChart" width="700" height="340"></canvas>
+      </div>
+      <div id="barGraphWrap" style="display:none;">
+        <div id="barTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
+        <canvas id="barChart" width="700" height="220"></canvas>
+        <div id="barInfo" style="margin-top:0.5rem;"></div>
+        <div id="barTitleAll" style="font-size:1.1em; font-weight:bold; margin-top:1em;"></div>
+        <div id="barInfoAll" style="margin-bottom:1em;"></div>
+      </div>
     </div>
   </div>
 
   <script>
+    // 그래프 토글 버튼 동작
+    const showLineBtn = document.getElementById('showLineBtn');
+    const showBarBtn = document.getElementById('showBarBtn');
+    const lineGraphWrap = document.getElementById('lineGraphWrap');
+    const barGraphWrap = document.getElementById('barGraphWrap');
+    // 디폴트: 아무것도 안보임
+    lineGraphWrap.style.display = 'none';
+    barGraphWrap.style.display = 'none';
+    showLineBtn.onclick = function() {
+      lineGraphWrap.style.display = 'block';
+      barGraphWrap.style.display = 'none';
+    };
+    showBarBtn.onclick = function() {
+      barGraphWrap.style.display = 'block';
+      lineGraphWrap.style.display = 'none';
+    };
     let selectedStation = null, openDate = null, lawdCode = null, allDeals = [], filtered = [];
+
+    // 그래프 토글 버튼 영역
+    const graphBtnWrap = document.getElementById('graphBtnWrap');
+    // 아래 함수들을 검색 성공/실패/초기화 시점에 호출해야 함
+    function showGraphButtons() {
+      graphBtnWrap.style.display = 'block';
+    }
+    function hideGraphButtons() {
+      graphBtnWrap.style.display = 'none';
+      // 그래프도 모두 숨김 (초기화)
+      lineGraphWrap.style.display = 'none';
+      barGraphWrap.style.display = 'none';
+    }
+    // 예시: 검색 성공 시 showGraphButtons(), 검색 실패/초기화 시 hideGraphButtons() 호출 필요
+
+
+    // 로딩 상태 표시 함수
+    function showSubwayLoading() {
+  const loading = document.getElementById('loading');
+  loading.innerHTML = '<div style="font-size:1.1em; margin-bottom:0.5em;">검색중입니다. 잠시만 기다려주십시오.</div>' +
+    '<img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmkydTYyN3Bjcnp1bWhtNDhuMWhmNXlvbDIwcmo3ajl0ejVpZHgwMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TlK63EDww4g4tXUd0gE/giphy.gif" style="width:100px;">';
+  loading.style.display = '';
+}
+    function showAptLoading() {
+      const loading = document.getElementById('loading');
+      loading.innerHTML = '<div style="font-size:1.1em; margin-bottom:0.5em;">데이터 수집 중입니다. 잠시만 기다려주십시오.</div>' +
+        '<img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWFkYmd0dnltZ3Jtd2lvdW5wZXU0N2RpaDB1aThuaTRleGZmc282NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2tRloUSmjNugV9morX/giphy.gif" style="width:100px;">';
+      loading.style.display = '';
+    }
+    function hideLoading() {
+      const loading = document.getElementById('loading');
+      loading.innerHTML = '';
+      loading.style.display = 'none';
+    }
     let lineChartObj = null, barChartObj = null;
     let lineChartAllObj = null, barChartAllObj = null; // 전체 차트 객체
     let filterEverShown = false; // 한 번이라도 거래 그래프가 그려졌으면 true
     let BAR_YEAR = 3; // 기본값은 3년
     // ======== 초기화 및 필터 이벤트 연결 ========
     window.onload = function() {
-      // 검색 버튼 클릭 시 검색 실행
-      document.getElementById('searchBtn').onclick = searchStations;
-      // 엔터 입력 시 검색 실행
+      // 검색 버튼 클릭 시 지하철 로딩 표시 후 검색 실행
+      document.getElementById('searchBtn').onclick = function() {
+        showSubwayLoading();
+        searchStations();
+      };
+      // 엔터 입력 시 지하철 로딩 표시 후 검색 실행
       document.getElementById('stationInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
+          showSubwayLoading();
           searchStations();
           e.preventDefault();
         }
@@ -97,6 +216,23 @@
      * - 각 역 이름 옆에 (주소, 개통일) 정보도 함께 표시
      */
     async function searchStations() {
+  // --- 데이터 완전 초기화 (역 바꿀 때마다) ---
+  allDeals = [];
+  filtered = [];
+  selectedStation = null;
+  openDate = null;
+  lawdCode = null;
+  // 필터 드롭다운 초기화 및 비활성화
+  const filterIds = ['aptSelect', 'areaSelect', 'floorSelect', 'umdSelect', 'roadSelect'];
+  filterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<option value="">전체</option>';
+      el.disabled = true;
+    }
+  });
+  // 검색 시작 시 로딩 표시 (지하철)
+  showSubwayLoading();
   // 새로운 역 검색 시 필터/그래프 상태 초기화
   filterEverShown = false;
   if (lineChartObj) { lineChartObj.destroy(); lineChartObj = null; }
@@ -116,29 +252,67 @@
         document.getElementById('station-list').innerHTML = '<span style="color:#c00;">지하철명을 입력해 주세요.</span>';
         return;
       }
-      document.getElementById('station-list').innerHTML = '검색 중...';
-      // API 호출: 역 정보 가져오기
-      const res = await fetch(`http://192.168.1.42:8000/subway/getsubway?station=${encodeURIComponent(keyword)}`);
-      const json = await res.json();
-      const stationList = json.results || [];
-      if (!json.result || !stationList.length) {
-        document.getElementById('station-list').innerHTML = '<i>검색 결과 없음</i>';
-        document.getElementById('filter-section').style.display = 'none';
+      // '역'으로 끝나지 않으면 안내 메시지 출력
+      if (!keyword.endsWith('역')) {
+        document.getElementById('station-list').innerHTML = '<span style="color:#c00;">정확한 역명을 입력해주시길 바랍니다.</span>';
+        // Hide loading message and image
+        const loading = document.getElementById('loading');
+        if (loading) loading.innerHTML = '';
+        var subwayImg = document.getElementById('subway-img');
+        if (subwayImg) subwayImg.style.display = 'none';
+        var loadingGif = document.getElementById('loading-gif-container');
+        if (loadingGif) loadingGif.style.display = 'none';
+        // Hide graph buttons
+        var graphBtnWrap = document.getElementById('graphBtnWrap');
+        if (graphBtnWrap) graphBtnWrap.style.display = 'none';
+        // Hide graph areas
+        var lineGraphWrap = document.getElementById('lineGraphWrap');
+        if (lineGraphWrap) lineGraphWrap.style.display = 'none';
+        var barGraphWrap = document.getElementById('barGraphWrap');
+        if (barGraphWrap) barGraphWrap.style.display = 'none';
         return;
       }
-      // 검색 성공 시에만 필터 영역 표시. 이후에는 절대 숨기지 않음.
-      document.getElementById('filter-section').style.display = 'none'; // 역 검색만으론 숨김 유지
-      let html = '';
-      stationList.forEach((s, idx) => {
-        // 주소와 개통일 정보 표시
-        let addrStr = s.stationRoadAddress ? `주소 : ${s.stationRoadAddress}` : '';
-        let openStr = s.openDate ? `개통일 : ${s.openDate}` : '';
-        let infoStr = [addrStr, openStr].filter(Boolean).join(', ');
-        html += `<div class="station-item" data-idx="${idx}" onmouseover="highlightStation(this)" onmouseout="unhighlightStation(this)" onclick="selectStation(${idx})">${s.stationName}${infoStr ? ' ('+infoStr+')' : ''}</div>`;
-      });
-      window.stationData = stationList;
-      document.getElementById('station-list').innerHTML = html;
-    }
+      // Show subway image and loading gif container for other cases
+      var subwayImg = document.getElementById('subway-img');
+      if (subwayImg) subwayImg.style.display = '';
+      var loadingGif = document.getElementById('loading-gif-container');
+      if (loadingGif) loadingGif.style.display = '';
+
+      document.getElementById('station-list').innerHTML = '';
+      // API 호출: 역 정보 가져오기
+       const res = await fetch(`http://192.168.1.42:8000/subway/getsubway?station=${encodeURIComponent(keyword)}`);
+       const json = await res.json();
+       let stationList = json.results || [];
+
+       // Exact match filtering (case-insensitive, trimmed)
+       stationList = stationList.filter(s => s.stationName.trim().toLowerCase() === keyword.toLowerCase());
+
+       const noDataOrAllBefore1999 = !json.result || !stationList.length || (stationList.length > 0 && stationList.every(s => s.openDate && s.openDate.slice(0,4) < '1999'));
+if (noDataOrAllBefore1999) {
+  // Ensure ONLY the message is shown, with no loading gif or previous content
+  const loading = document.getElementById('loading');
+  loading.innerHTML = '<span style="color:#c00; font-size:1.5em; font-weight:bold;">1999년 이전 역 정보는 없습니다.</span>';
+  document.getElementById('filter-section').style.display = 'none';
+  var subwayImg = document.getElementById('subway-img');
+  if (subwayImg) subwayImg.style.display = 'none';
+  var loadingGif = document.getElementById('loading-gif-container');
+  if (loadingGif) loadingGif.style.display = 'none';
+  return;
+}
+       // 검색 성공 시에만 필터 영역 표시. 이후에는 절대 숨기지 않음.
+       document.getElementById('filter-section').style.display = 'none'; // 역 검색만으론 숨김 유지
+       let html = '';
+       stationList.forEach((s, idx) => {
+         // 주소와 개통일 정보 표시
+         let addrStr = s.stationRoadAddress ? `주소 : ${s.stationRoadAddress}` : '';
+         let openStr = s.openDate ? `개통일 : ${s.openDate}` : '';
+         let infoStr = [addrStr, openStr].filter(Boolean).join(', ');
+         html += `<div class="station-item" data-idx="${idx}" onmouseover="highlightStation(this)" onmouseout="unhighlightStation(this)" onclick="selectStation(${idx})">${s.stationName}${infoStr ? ' ('+infoStr+')' : ''}</div>`;
+       });
+       window.stationData = stationList;
+       document.getElementById('station-list').innerHTML = html;
+       hideLoading(); // 검색 결과 출력 후 로딩 숨김
+}
 
     function highlightStation(el) { el.classList.add('selected'); }
     function unhighlightStation(el) { el.classList.remove('selected'); }
@@ -295,8 +469,25 @@
     }
 
     async function selectStation(idx) {
-  // 새로운 역 선택 시 필터/그래프 상태 초기화
-  filterEverShown = false;
+  // --- 데이터 완전 초기화 (역 바꿀 때마다) ---
+  allDeals = [];
+  filtered = [];
+  openDate = null;
+  lawdCode = null;
+  // 필터 드롭다운 초기화 및 비활성화
+  const filterIds = ['aptSelect', 'areaSelect', 'floorSelect', 'umdSelect', 'roadSelect'];
+  filterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<option value="">전체</option>';
+      el.disabled = true;
+    }
+  });
+  // 새로운 역 선택 시 로딩 표시
+  showAptLoading();
+  try {
+    // 새로운 역 선택 시 필터/그래프 상태 초기화
+    filterEverShown = false;
   if (lineChartObj) { lineChartObj.destroy(); lineChartObj = null; }
   if (barChartObj) { barChartObj.destroy(); barChartObj = null; }
   if (lineChartAllObj) { lineChartAllObj.destroy(); lineChartAllObj = null; }
@@ -309,11 +500,17 @@
   document.getElementById('barInfoAll').innerHTML = '';
   // 역 선택 시에는 filter-section을 직접 제어하지 않음 (renderAll에서만 제어)
   const s = window.stationData[idx];
-      selectedStation = s;
+       // 역 선택 시 이전 상태 완전 초기화
+       allDeals = [];
+       filtered = [];
+       openDate = null;
+       lawdCode = null;
+       selectedStation = s;
       let lineStr = s.line ? `${s.line}` : '';
       let road = s.stationRoadAddress ? s.stationRoadAddress : '';
       let infoStr = [lineStr, road].filter(Boolean).join(', ');
       document.getElementById('station-list').innerHTML = `<b>${s.stationName}${infoStr ? ' ('+infoStr+')' : ''}</b>`;
+      showGraphButtons();
       document.getElementById('loading').style.display = '';
       document.getElementById('lineChart').style.display = 'none';
       document.getElementById('barChart').style.display = 'none';
@@ -324,31 +521,40 @@
       if (!lawdCode || !openDate) {
         document.getElementById('loading').style.display = 'none';
         alert('법정동코드 또는 개통일 정보가 없습니다.');
+        hideGraphButtons();
         return;
       }
-      // 거래 데이터 수집 및 임시 df 저장
-      document.getElementById('loading').style.display = '';
-      await fetch(`http://192.168.1.42:8000/apartment/getapartment_by_code?bubjungdongCode=${lawdCode}&openDate=${openDate}`);
-      // 임시 df에서 데이터 fetch
-      const dfRes = await fetch('http://192.168.1.42:8000/apartment/current_df');
-      const dfJson = await dfRes.json();
-      allDeals = (dfJson && dfJson.result && dfJson.data) ? dfJson.data : [];
+      // 선택된 역의 거래 데이터 직접 가져오기 (임시 current_df 사용 안함)
+       document.getElementById('loading').style.display = '';
+       const dfRes = await fetch(`http://192.168.1.42:8000/apartment/getapartment_by_code?bubjungdongCode=${lawdCode}&openDate=${openDate}`);
+       const dfJson = await dfRes.json();
+       allDeals = (dfJson && dfJson.result && dfJson.data) ? dfJson.data : [];
       document.getElementById('loading').style.display = 'none';
       if (!allDeals.length) {
         document.getElementById('barTitle').innerText = '';
         document.getElementById('barTitleAll').innerText = '';
-        document.getElementById('lineTitle').innerText = '데이터가 없습니다.';
+        document.getElementById('station-info').innerText = '1998년 이전의 정보는 없습니다.';
         document.getElementById('deal-list-section').innerHTML = '';
         document.getElementById('filter-section').style.display = 'none';
+        hideGraphButtons();
+        hideLoading();
         return;
       }
       setFilterOptions();
+  // 필터 드롭다운 활성화 (데이터가 정상적으로 로딩된 경우에만)
+  ['aptSelect', 'areaSelect', 'floorSelect', 'umdSelect', 'roadSelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
       // startMonth, endMonth 입력란은 삭제되어 더 이상 값 설정 불가. 관련 코드 완전 제거.
       filterAndRender();
+      hideLoading();
+    } catch (err) {
+      hideLoading();
+      throw err;
     }
-
-
-
+    hideLoading();
+  }
 
     function renderAll() {
   // 한 번이라도 거래 데이터가 있으면 filterEverShown 유지
@@ -357,6 +563,10 @@
   renderBarChart();
   // filterEverShown이 true면 무조건 필터 표시
   document.getElementById('filter-section').style.display = filterEverShown ? 'block' : 'none';
+  // 그래프 출력 후 접기/펼치기 UI 활성화
+  if (filtered.length > 0) {
+    showCollapsiblesAfterGraph();
+  }
 }
 
     function renderDealList() {

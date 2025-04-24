@@ -25,7 +25,7 @@ app = FastAPI()
 router = APIRouter()
 
 # 단일 사용자용 임시 DataFrame(리스트)
-current_apartment_df = None
+# (전역 변수 제거)
 
 class ApartmentItem(BaseModel):
     apartmentName: str
@@ -56,81 +56,33 @@ async def GetApartmentByCode(
     openDate: str = Query(..., title="개통일", description="지하철 개통일 8자리(YYYYMMDD)", min_length=8, max_length=8)
 ):
     try:
-        open_date = datetime.strptime(openDate, "%Y%m%d")
-        start_date = open_date.replace(day=1) - timedelta(days=3*365)
-        end_date = open_date.replace(day=1) + timedelta(days=3*365)
-        url = 'https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev'
-        items = []
-        current_date = start_date
-        while current_date <= end_date:
-            deal_ymd = current_date.strftime("%Y%m")
-            params = {
-                'serviceKey': get_secret("data_apiKey_Decoding"),
-                'LAWD_CD': bubjungdongCode[:5],
-                'DEAL_YMD': deal_ymd,
-                'pageNo': 1,
-                'numOfRows': 100
+        # 캐시 컬렉션에서 정확히 일치하는 데이터만 반환
+        cache_col = client["apartment"]["apartment_cache"]
+        cache_doc = cache_col.find_one({"bubjungdongCode": bubjungdongCode, "openDate": openDate})
+        if cache_doc and "results" in cache_doc:
+            return {
+                "result": True,
+                "resultCount": len(cache_doc["results"]),
+                "data": cache_doc["results"]
             }
-            response = requests.get(url, params=params)
-            print("[DEBUG] API 요청 URL:", response.url)
-            print("[DEBUG] API 응답 원본:", response.text[:1000])
-            try:
-                root = ET.fromstring(response.content)
-                for item in root.findall('.//item'):
-                    try:
-                        deal_amount_node = item.find('거래금액') or item.find('dealAmount')
-                        deal_year_node = item.find('년') or item.find('dealYear')
-                        deal_month_node = item.find('월') or item.find('dealMonth')
-                        deal_day_node = item.find('일') or item.find('dealDay')
-                        apt_name_node = item.find('아파트') or item.find('aptNm')
-                        # 필수 필드만 있으면 추가 (없으면 건너뜀)
-                        if None in [deal_amount_node, deal_year_node, deal_month_node, apt_name_node]:
-                            print("[SKIP] 필수 필드 누락")
-                            continue
-                        deal_amount = deal_amount_node.text.replace(",", "").strip()
-                        deal_year = deal_year_node.text.strip()
-                        deal_month = deal_month_node.text.strip().zfill(2)
-                        deal_day = deal_day_node.text.strip().zfill(2) if deal_day_node is not None else "01"
-                        apt_name = apt_name_node.text.strip()
-                        road_name = item.find('도로명') or item.find('roadNm')
-                        road_name = road_name.text.strip() if road_name is not None else ""
-                        road_bonbun = item.find('도로명건물본번호코드') or item.find('roadNmBonbun')
-                        road_bonbun = road_bonbun.text.strip() if road_bonbun is not None else ""
-                        road_bubun = item.find('도로명건물부번호코드') or item.find('roadNmBubun')
-                        road_bubun = road_bubun.text.strip() if road_bubun is not None else ""
-                        umd_name = item.find('법정동') or item.find('umdNm')
-                        umd_name = umd_name.text.strip() if umd_name is not None else ""
-                        sgg_cd = item.find('법정동시군구코드') or item.find('sggCd')
-                        sgg_cd = sgg_cd.text.strip() if sgg_cd is not None else ""
-                        jibun = item.find('지번') or item.find('jibun')
-                        jibun = jibun.text.strip() if jibun is not None else ""
-                        area = item.find('전용면적') or item.find('excluUseAr')
-                        area = area.text.strip() if area is not None else ""
-                        floor = item.find('층') or item.find('floor')
-                        floor = floor.text.strip() if floor is not None else ""
-                        address = f"{sgg_cd} {umd_name} {road_name} {road_bonbun}-{road_bubun} ({jibun})".strip()
-                        apt_item = {
-                            "apartmentName": apt_name,
-                            "dealAmount": deal_amount,
-                            "dealDate": f"{deal_year}-{deal_month}-{deal_day}",
-                            "address": address,
-                            "area": area,
-                            "floor": floor,
-                            
-                        }
-                        print(f"[ADD] 거래 데이터: {apt_item}")
-                        items.append(apt_item)
-                    except Exception as e:
-                        print(f"데이터 파싱 오류: {e}")
-            except Exception as e:
-                print(f"API 요청/파싱 오류: {e}")
-            if current_date.month == 12:
-                current_date = current_date.replace(year=current_date.year+1, month=1)
-            else:
-                current_date = current_date.replace(month=current_date.month+1)
+        # 캐시에 없으면 빈 결과 반환 (API 직접 수집은 별도 함수에서 담당)
+        return {
+            "result": False,
+            "resultCount": 0,
+            "data": [],
+            "message": "해당 역/개통일의 데이터가 없습니다."
+        }
+    except Exception as e:
+        return {"result": False, "message": str(e)}
+
         global current_apartment_df
         current_apartment_df = items
         print(f"[DF SAVE] current_apartment_df 저장: {len(current_apartment_df)}건")
+        # 2. 수집 결과를 캐시에 저장
+        cache_col.update_one(
+            {"bubjungdongCode": bubjungdongCode, "openDate": openDate},
+            {"$set": {"results": items}}, upsert=True
+        )
         return {
             "result": True,
             "resultCount": len(items),
