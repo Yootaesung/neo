@@ -65,13 +65,75 @@ async def GetApartmentByCode(
                 "resultCount": len(cache_doc["results"]),
                 "data": cache_doc["results"]
             }
-        # 캐시에 없으면 빈 결과 반환 (API 직접 수집은 별도 함수에서 담당)
-        return {
-            "result": False,
-            "resultCount": 0,
-            "data": [],
-            "message": "해당 역/개통일의 데이터가 없습니다."
-        }
+        # 캐시에 없으면 외부 API에서 직접 데이터 수집 시도
+        # 1. 외부 API 요청 (공공데이터포털)
+        from datetime import datetime, timedelta
+        import requests
+        import xml.etree.ElementTree as ET
+        items = []
+        try:
+            open_date = datetime.strptime(openDate, "%Y%m%d")
+            start_date = open_date.replace(day=1) - timedelta(days=3*365)
+            end_date = open_date.replace(day=1) + timedelta(days=3*365)
+            url = 'https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev'
+            current_date = start_date
+            while current_date <= end_date:
+                deal_ymd = current_date.strftime("%Y%m")
+                params = '?serviceKey=' + get_secret("data_apiKey")
+                params += '&LAWD_CD=' + bubjungdongCode[:5]
+                params += '&DEAL_YMD=' + deal_ymd
+                params += '&pageNo=1&numOfRows=100'
+                url_with_params = url + params
+                try:
+                    response = requests.get(url_with_params)
+                    root = ET.fromstring(response.content)
+                    for item in root.findall('.//item'):
+                        try:
+                            deal_amount_node = item.find('거래금액')
+                            deal_year_node = item.find('년')
+                            deal_month_node = item.find('월')
+                            apt_name_node = item.find('아파트') or item.find('aptNm')
+                            if None in [deal_amount_node, deal_year_node, deal_month_node, apt_name_node]:
+                                continue
+                            deal_amount = deal_amount_node.text.replace(",", "").strip()
+                            deal_year = deal_year_node.text.strip()
+                            deal_month = deal_month_node.text.strip().zfill(2)
+                            deal_day = item.find('일').text.strip().zfill(2) if item.find('일') is not None else "01"
+                            apt_name = apt_name_node.text.strip()
+                            road_name = item.find('도로명').text.strip() if item.find('도로명') is not None else ""
+                            items.append({
+                                "apartmentName": apt_name,
+                                "dealAmount": deal_amount,
+                                "dealDate": f"{deal_year}-{deal_month}-{deal_day}",
+                                "roadName": road_name
+                            })
+                        except Exception as e:
+                            print(f"데이터 파싱 오류: {e}")
+                except Exception as e:
+                    print(f"API 요청/파싱 오류: {e}")
+                # 다음 달로 이동
+                if current_date.month == 12:
+                    current_date = current_date.replace(year=current_date.year+1, month=1)
+                else:
+                    current_date = current_date.replace(month=current_date.month+1)
+            # 캐시에 저장
+            cache_col.update_one(
+                {"bubjungdongCode": bubjungdongCode, "openDate": openDate},
+                {"$set": {"results": items}}, upsert=True
+            )
+            return {
+                "result": True,
+                "resultCount": len(items),
+                "data": items,
+                "message": "외부 API에서 데이터를 수집하여 반환합니다."
+            }
+        except Exception as e:
+            return {
+                "result": False,
+                "resultCount": 0,
+                "data": [],
+                "message": f"외부 API 수집 실패: {str(e)}"
+            }
     except Exception as e:
         return {"result": False, "message": str(e)}
 

@@ -31,6 +31,7 @@
       </div>
     </div>
   </section>
+  <div id="station-info" style="margin-bottom:1.2em; color:#c00; font-weight:bold;"></div>
   <section id="filter-section" style="margin-bottom:1.5rem; display:none;">
     <button id="toggle-filter-section" type="button" style="font-size:0.95em; margin-bottom:0.3em; display:none;">▼ 필터 접기</button>
     <div id="filter-content">
@@ -190,23 +191,31 @@
     let BAR_YEAR = 3; // 기본값은 3년
     // ======== 초기화 및 필터 이벤트 연결 ========
     window.onload = function() {
+      // 기간 필터를 항상 최신값으로 동기화
+      const yearSel = document.getElementById('yearRangeSelect');
+      BAR_YEAR = parseInt(yearSel.value);
+      yearSel.addEventListener('change', function() {
+        BAR_YEAR = parseInt(this.value);
+        filterAndRender();
+      });
       // 검색 버튼 클릭 시 지하철 로딩 표시 후 검색 실행
       document.getElementById('searchBtn').onclick = function() {
+        // 안내문구 초기화
+        var stationInfo = document.getElementById('station-info');
+        if (stationInfo) stationInfo.innerText = '';
         showSubwayLoading();
         searchStations();
       };
       // 엔터 입력 시 지하철 로딩 표시 후 검색 실행
       document.getElementById('stationInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
+          // 안내문구 초기화
+          var stationInfo = document.getElementById('station-info');
+          if (stationInfo) stationInfo.innerText = '';
           showSubwayLoading();
           searchStations();
           e.preventDefault();
         }
-      });
-      // 기간(년) 변경 시 바 차트 갱신
-      document.getElementById('yearRangeSelect').addEventListener('change', function() {
-        BAR_YEAR = parseInt(this.value);
-        filterAndRender();
       });
     }
 
@@ -516,6 +525,7 @@ if (noDataOrAllBefore1999) {
       document.getElementById('barChart').style.display = 'none';
       document.getElementById('barInfo').innerHTML = '';
       // 리스트에서 바로 법정동코드, 개통일 사용
+      // 반드시 선택된 역의 법정동코드를 사용하여 실거래가 API 호출
       lawdCode = s.bubjungdongCode;
       openDate = s.openDate;
       if (!lawdCode || !openDate) {
@@ -529,7 +539,25 @@ if (noDataOrAllBefore1999) {
        const dfRes = await fetch(`http://192.168.1.42:8000/apartment/getapartment_by_code?bubjungdongCode=${lawdCode}&openDate=${openDate}`);
        const dfJson = await dfRes.json();
        allDeals = (dfJson && dfJson.result && dfJson.data) ? dfJson.data : [];
-      document.getElementById('loading').style.display = 'none';
+       document.getElementById('loading').style.display = 'none';
+
+       // robust exception handling for empty/no data
+       if (!allDeals.length) {
+         // 안전하게 null 체크 후 안내 메시지 표시
+         const barTitle = document.getElementById('barTitle');
+         const barTitleAll = document.getElementById('barTitleAll');
+         const stationInfo = document.getElementById('station-info');
+         const dealListSection = document.getElementById('deal-list-section');
+         const filterSection = document.getElementById('filter-section');
+         if (barTitle) barTitle.innerText = '';
+         if (barTitleAll) barTitleAll.innerText = '';
+         if (stationInfo) stationInfo.innerText = '해당 역의 실거래가 데이터가 없습니다.';
+         if (dealListSection) dealListSection.innerHTML = '';
+         if (filterSection) filterSection.style.display = 'none';
+         hideGraphButtons && hideGraphButtons();
+         hideLoading && hideLoading();
+         return;
+       }
       if (!allDeals.length) {
         document.getElementById('barTitle').innerText = '';
         document.getElementById('barTitleAll').innerText = '';
@@ -587,9 +615,42 @@ if (noDataOrAllBefore1999) {
     function renderLineChart() {
   try {
     if (!filtered.length) return;
-    // 거래일별 평균 거래금액 계산
+    // 항상 최신 BAR_YEAR로 동기화
+    const yearSel = document.getElementById('yearRangeSelect');
+    BAR_YEAR = parseInt(yearSel.value);
+    // 거래일별 평균 거래금액 계산 (기간 필터 적용)
+    // 날짜 포맷 보정 함수
+    function toYMD(dateStr) {
+      if (dateStr && dateStr.length === 8) {
+        return dateStr.slice(0,4) + '-' + dateStr.slice(4,6) + '-' + dateStr.slice(6,8);
+      }
+      return dateStr;
+    }
+    let dealsInPeriod = filtered;
+    let validOpenYMD = null;
+    let filterPeriodStart = null, filterPeriodEnd = null;
+    let openYMD = toYMD(openDate);
+    if (typeof openYMD === 'string' && openYMD.length === 10) {
+      validOpenYMD = openYMD;
+    }
+    const isValidOpenYMD = validOpenYMD && /^\d{4}-\d{2}-\d{2}$/.test(validOpenYMD) && parseInt(validOpenYMD.replace(/-/g,'')) >= 19900101;
+    if (isValidOpenYMD) {
+      function addYearYMD(ymd, n) {
+        // ymd: 'YYYY-MM-DD'
+        const y = parseInt(ymd.slice(0,4)) + n;
+        return y + ymd.slice(4,10);
+      }
+      filterPeriodStart = addYearYMD(openYMD, -BAR_YEAR);
+      filterPeriodEnd = addYearYMD(openYMD, BAR_YEAR);
+      dealsInPeriod = filtered.filter(d => {
+        let dealYMD = d.dealDate.length === 8 ? toYMD(d.dealDate) : d.dealDate;
+        return dealYMD >= filterPeriodStart && dealYMD <= filterPeriodEnd;
+      });
+    }
+    // 디버그: 기간 필터 상태 로그
+    console.log('[DEBUG] openDate:', openDate, 'openYMD:', openYMD, 'BAR_YEAR:', BAR_YEAR, 'filterPeriodStart:', filterPeriodStart, 'filterPeriodEnd:', filterPeriodEnd, 'dealsInPeriod.length:', dealsInPeriod.length, 'sample:', dealsInPeriod.slice(0,3));
     const byDate = {};
-    filtered.forEach(d => {
+    dealsInPeriod.forEach(d => {
       if (!d.dealDate || isNaN(parseInt(d.dealAmount.replace(/,/g, '')))) {
         console.warn('[renderLineChart] 잘못된 거래 데이터:', d);
         return;
@@ -612,62 +673,49 @@ if (noDataOrAllBefore1999) {
       m = ((m-1)%12)+1;
       return y+'-'+(m<10?'0':'')+m;
     }
-    // 1. 월별 평균값
+    // 1. 월별 평균값 (기간 필터: 바 차트와 동일하게 적용)
     const monthAvg = {};
-    Object.keys(byDate).forEach(date => {
-      const ym = date.slice(0,7);
+    let validOpenYM = null;
+    if (typeof openDate === 'string' && openDate.length >= 7) {
+      validOpenYM = openDate.slice(0,7);
+    }
+    // openDate가 1990-01 이후(즉, 1990년 이후)일 때만 ±N년 구간 생성
+    const isValidOpenYM = validOpenYM && /^\d{4}-\d{2}$/.test(validOpenYM) && parseInt(validOpenYM.replace('-','')) >= 199001;
+    let labelPeriodStart = null, labelPeriodEnd = null;
+    if (isValidOpenYM) {
+      // 바차트와 동일하게, YYYY-MM-DD 단위로 필터
+      function addYearYMD(ymd, n) {
+        const y = parseInt(ymd.slice(0,4)) + n;
+        return y + ymd.slice(4,10);
+      }
+      labelPeriodStart = addYearYMD(openDate, -BAR_YEAR);
+      labelPeriodEnd = addYearYMD(openDate, BAR_YEAR);
+    }
+    // 거래 데이터에서 기간 내 데이터만 집계 (dealsInPeriod만 사용)
+    dealsInPeriod.forEach(d => {
+      if (!d.dealDate) return;
+      const ym = d.dealDate.slice(0,7);
       if (!monthAvg[ym]) monthAvg[ym]=[];
-      monthAvg[ym].push(...byDate[date]);
+      const v = parseInt(d.dealAmount.replace(/,/g, ''));
+      if (!isNaN(v)) monthAvg[ym].push(v);
     });
     Object.keys(monthAvg).forEach(ym => {
       const arr = monthAvg[ym];
       monthAvg[ym] = arr.reduce((a,b)=>a+b,0)/arr.length;
     });
     // 2. 모든 월 구간 생성
-    const months = Object.keys(monthAvg).sort();
-    if (months.length<2) {
-      // 데이터가 1개월 뿐이면 그대로 출력
-      var labels = months;
-      var data = months.map(m=>monthAvg[m]);
-    } else {
-      let allMonths = [];
-      let cur = months[0];
-      const last = months[months.length-1];
-      while (cur <= last) {
-        allMonths.push(cur);
-        // 다음 달로
-        let [y, m] = cur.split('-').map(Number);
-        m++;
-        if (m>12) { m=1; y++; }
-        cur = y+'-'+(m<10?'0':'')+m;
-      }
-      // 3. 보간값 채우기
-      let filled = [];
-      for (let i=0; i<allMonths.length; ++i) {
-        const ym = allMonths[i];
-        if (monthAvg[ym]!==undefined) {
-          filled.push(monthAvg[ym]);
-        } else {
-          // 이전/다음 값 찾기
-          let prevIdx = i-1;
-          let nextIdx = i+1;
-          while (prevIdx>=0 && monthAvg[allMonths[prevIdx]]===undefined) prevIdx--;
-          while (nextIdx<allMonths.length && monthAvg[allMonths[nextIdx]]===undefined) nextIdx++;
-          if (prevIdx>=0 && nextIdx<allMonths.length) {
-            // 선형 보간
-            let prevVal = monthAvg[allMonths[prevIdx]];
-            let nextVal = monthAvg[allMonths[nextIdx]];
-            let gap = nextIdx-prevIdx;
-            let frac = (i-prevIdx)/gap;
-            filled.push(prevVal + (nextVal-prevVal)*frac);
-          } else {
-            filled.push(null);
-          }
-        }
-      }
-      var labels = allMonths;
-      var data = filled;
+    function addYearYM(ym, n) {
+      let [y, m] = ym.split('-').map(Number);
+      y += n;
+      return y+'-'+(m<10?'0':'')+m;
     }
+    // dealsInPeriod에 실제 거래가 있는 월만 labels/data로 사용
+    let labels = [], data = [];
+    const monthKeys = Array.from(new Set(dealsInPeriod.map(d => d.dealDate.slice(0,7)))).sort();
+    labels = monthKeys;
+    data = labels.map(m => monthAvg[m]);
+    // X축에는 기간 내 실제 거래가 있는 월만 표시됨
+
     let openX = openDate;
     if (lineChartObj) lineChartObj.destroy();
     lineChartObj = new Chart(document.getElementById('lineChart'), {
