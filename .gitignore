@@ -42,3 +42,4 @@ oracle/**/package-lock.json
 ## node.js
 node/**/node_modules
 node/**/package-lock.json
+node/**/.severlsess
