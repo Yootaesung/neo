@@ -1,0 +1,41 @@
+[33mcommit 7d7256fa83fd17d5bef32fb4baf0f9f1380d5cfd[m
+Author: Yootaesung <xotjdgg@gamil.com>
+Date:   Thu May 1 06:38:22 2025 +0000
+
+    Remove secret.json from version control and ignore it
+
+[33mcommit 0d5068d15da02ae9c344d0e57417fcf4a1d04054[m
+Author: Yootaesung <xotjdgg@gamil.com>
+Date:   Thu May 1 06:31:33 2025 +0000
+
+    slack
+
+[33mcommit 86a9fd9fac7aef626dc2f5761d7148c4fbafb36d[m
+Author: Yootaesung <xotjdgg@gmail.com>
+Date:   Wed Apr 23 21:11:16 2025 +0900
+
+    project
+
+[33mcommit 07b17dc22dee0fe00eb48a54093220c8a8350f20[m
+Author: Yootaesung <xotjdgg@gmail.com>
+Date:   Tue Apr 22 19:43:00 2025 +0900
+
+    project
+
+[33mcommit 5f4bc3cdc48ceedb8e3b4aa4819912dceaaa09da[m
+Author: Yootaesung <xotjdgg@gmail.com>
+Date:   Fri Apr 18 13:07:30 2025 +0900
+
+    fastapi
+
+[33mcommit ebd409be41758d07a0358d184580cb3515cb7451[m
+Author: Yootaesung <xotjdgg@gmail.com>
+Date:   Thu Apr 17 17:38:37 2025 +0900
+
+    api
+
+[33mcommit c09c6505531094937e0c593614b8f850a90a14e9[m
+Author: Yootaesung <xotjdgg@gmail.com>
+Date:   Tue Apr 15 17:07:58 2025 +0900
+
+    chicken
