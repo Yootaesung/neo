@@ -46,3 +46,6 @@ node/**/.severlsesssecret.json
 
 ## secret
 secret.json
+
+## .env
+.env
