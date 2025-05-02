@@ -13,8 +13,8 @@ app.use(express.urlencoded({ extended : true }))
 const AWS = require('aws-sdk');
 const ID = process.env.ID;
 const SECRET = process.env.SECRET;
-const BUCKET_NAME = 'kibwa-00';
-const MYREGION = 'ap-northeast-2';
+const BUCKET_NAME = 'kibwa-05';
+const MYREGION = 'ap-northeast-3';
 const s3 = new AWS.S3({ accessKeyId: ID, secretAccessKey: SECRET, region: MYREGION });
 
 app.get('/list', (req, res) => {
