@@ -49,3 +49,7 @@ secret.json
 
 ## .env
 .env
+
+## docker
+docker/mysql/mysql*
+docker/mongodb/mongo*
