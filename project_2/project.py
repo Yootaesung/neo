@@ -72,7 +72,7 @@ def recognize_and_filter(audio_data):
             if len(word) > 1:  # 한 글자는 의미가 적음
                 get_definition(word)
 
-        # 스피커로 오디오 데이터 출력
+        # 필터링된 오디오 데이터를 스피커로 출력
         output_stream.write(filtered_audio)
 
     except sr.UnknownValueError:
@@ -86,9 +86,6 @@ try:
     while True:
         # 마이크로부터 오디오 데이터 읽기
         audio_data = input_stream.read(CHUNK)
-
-        # 스피커로 오디오 데이터 출력
-        output_stream.write(audio_data)
 
         # 음성 인식을 별도의 스레드로 처리
         threading.Thread(target=recognize_and_filter, args=(audio_data,)).start()
