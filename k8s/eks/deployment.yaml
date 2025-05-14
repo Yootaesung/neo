@@ -32,4 +32,4 @@ spec:
       targetPort: 8080  # container port (pod port)
   type: LoadBalancer
   externalIPs:
-    - 192.168.1.188
+    - 13.208.146.222
