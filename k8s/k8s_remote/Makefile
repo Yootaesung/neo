@@ -2,53 +2,53 @@ all : build run k8init appdep appsvc getdep getsvc getpod
 restart : delsvc deldep delpod appdep appsvc getdep getsvc getpod
 stop : delsvc deldep delpod
 build:
-    docker build -t remote .
+	docker build -t remote .
 run:
-    docker run -it -d -p 8000:8000 --name remote remote
+	docker run -it -d -p 8000:8000 --name remote remote
 exec:    
-    docker exec -it remote /bin/bash
+	docker exec -it remote /bin/bash
 start:
-    docker start remote
+	docker start remote
 stop:
-    docker stop remote
+	docker stop remote
 logs:
-    docker logs remote
+	docker logs remote
 ps:
-    docker ps -a
+	docker ps -a
 img:
-    docker images
+	docker images
 rm:
-    docker rm -f $$(docker ps -aq)
+	docker rm -f $$(docker ps -aq)
 rmi:
-    docker rmi -f $$(docker images -q)
+	docker rmi -f $$(docker images -q)
 
 k8init:
-    docker commit remote remoteapi
-    docker tag remoteapi impelfin/remoteapi
-    docker push impelfin/remoteapi
-    docker rm -f $$(docker ps -aq)
-    docker rmi -f $$(docker images -q)
+	docker commit remote remoteapi
+	docker tag remoteapi impelfin/remoteapi
+	docker push impelfin/remoteapi
+	docker rm -f $$(docker ps -aq)
+	docker rmi -f $$(docker images -q)
 getnode:
-    kubectl get nodes
+	kubectl get nodes
 appdep:
-    kubectl apply -f delpoyment.yaml
+	kubectl apply -f delpoyment.yaml
 appsvc:
-    kubectl apply -f service.yaml
+	kubectl apply -f service.yaml
 getdep:
-    kubectl get deployment
+	kubectl get deployment
 getsvc:
-    kubectl get svc -o wide
+	kubectl get svc -o wide
 getpod:
-    kubectl get pod -o wide
+	kubectl get pod -o wide
 delsvc:
-    kubectl delete svc remoteapi
+	kubectl delete svc remoteapi
 deldep:
-    kubectl delete deployment remoteapi
+	kubectl delete deployment remoteapi
 delpod:
-    kubectl get pod | grep remoteapi | awk '{print $$1}' | xargs -I {} kubectl delete pod {} --force
+	kubectl get pod | grep remoteapi | awk '{print $$1}' | xargs -I {} kubectl delete pod {} --force
 desdep:
-    kubectl describe deployment remoteapi
+	kubectl describe deployment remoteapi
 dessvc:
-    kubectl describe svc remoteapi
+	kubectl describe svc remoteapi
 despod:
-    kubectl describe pod remoteapi
+	kubectl describe pod remoteapi
