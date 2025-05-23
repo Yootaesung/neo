@@ -27,8 +27,8 @@ scala/**/target
 ## python
 .idea
 secret.json
-python/**/.venv
-python/**/__pycache__/
+**/.venv
+**/__pycache__/
 **/ secret.json
 
 ## mongodb
@@ -53,3 +53,4 @@ secret.json
 ## docker
 docker/mysql/mysql*
 docker/mongodb/mongo*
+
