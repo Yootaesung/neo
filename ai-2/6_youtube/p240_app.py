@@ -20,6 +20,6 @@ target_language = 'KO'
 try:
     summary = summarize_contents(contents_url, target_language)
     print('[콘텐츠 URL] ', contents_url)
-    print('- 요약 내용(축약) : ', textwrap.shorten(summary, width=150, placeholder=' [...이하 생략...]'))
+    print("- 요약 내용(축약) : ", textwrap.shorten(summary, width=150, placeholder="[...이하 생략...]"))
 except:
-    print("헤당 URL의 내용을 요약하지 못했습니다.다시 시도해 주세요.")
+    print("해당 URL의 내용을 요약하지 못했습니다. 다시 시도해 주세요.")
