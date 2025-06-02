@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>아파트 실거래가 시각화 데모</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    #filter-form { margin-bottom: 1rem; }
+    table { border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.3rem 0.7rem; }
+    th { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>아파트 실거래가 시각화 데모</h1>
+  <form id="filter-form">
+    <label>최소 면적(㎡): <input type="number" id="minArea" step="0.1"></label>
+    <label>최대 면적(㎡): <input type="number" id="maxArea" step="0.1"></label>
+    <label>아파트명: <input type="text" id="aptName"></label>
+    <button type="submit">필터 적용</button>
+  </form>
+
+  <canvas id="lineChart" width="800" height="300"></canvas>
+  <canvas id="barChart" width="800" height="200" style="margin-top:2rem;"></canvas>
+
+  <div id="deals-table"></div>
+
+  <script>
+    let rawData = [];
+    let filtered = [];
+
+    async function fetchDeals() {
+      const res = await fetch('http://localhost:8000/apartment/current_df?limit=1000');
+      const json = await res.json();
+      rawData = json.data;
+      filtered = rawData;
+      renderAll();
+    }
+
+    function filterData() {
+      const minArea = parseFloat(document.getElementById('minArea').value) || -Infinity;
+      const maxArea = parseFloat(document.getElementById('maxArea').value) || Infinity;
+      const aptName = document.getElementById('aptName').value.trim();
+      filtered = rawData.filter(d => {
+        return (
+          (!aptName || d.apartmentName.includes(aptName)) &&
+          parseFloat(d.area) >= minArea &&
+          parseFloat(d.area) <= maxArea
+        );
+      });
+      renderAll();
+    }
+
+    function renderTable() {
+      let html = '<table><thead><tr><th>아파트명</th><th>거래일</th><th>면적</th><th>층</th><th>거래금액(만원)</th><th>주소</th></tr></thead><tbody>';
+      filtered.forEach(d => {
+        html += `<tr><td>${d.apartmentName}</td><td>${d.dealDate}</td><td>${d.area}</td><td>${d.floor}</td><td>${d.dealAmount}</td><td>${d.address}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      document.getElementById('deals-table').innerHTML = html;
+    }
+
+    function renderLineChart() {
+      // 거래일별 평균 거래금액 추이
+      const byDate = {};
+      filtered.forEach(d => {
+        if (!byDate[d.dealDate]) byDate[d.dealDate] = [];
+        byDate[d.dealDate].push(parseInt(d.dealAmount.replace(/,/g, '')));
+      });
+      const labels = Object.keys(byDate).sort();
+      const data = labels.map(date => {
+        const arr = byDate[date];
+        return arr.reduce((a,b)=>a+b,0)/arr.length;
+      });
+      if (window.lineChartObj) window.lineChartObj.destroy();
+      window.lineChartObj = new Chart(document.getElementById('lineChart'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '일별 평균 거래금액(만원)',
+            data: data,
+            borderColor: 'blue',
+            fill: false,
+            pointRadius: 2
+          }]
+        },
+        options: {responsive: false, plugins: {legend: {display: true}}}
+      });
+    }
+
+    function renderBarChart() {
+      // 개통일 전/후 평균 거래금액
+      if (!filtered.length) return;
+      // 예시: 개통일은 데이터의 중앙값 날짜로 임시 설정
+      const dates = filtered.map(d=>d.dealDate).sort();
+      const midIdx = Math.floor(dates.length/2);
+      const openDate = dates[midIdx];
+      const before = filtered.filter(d=>d.dealDate <= openDate);
+      const after = filtered.filter(d=>d.dealDate > openDate);
+      const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+      const avgBefore = avg(before.map(d=>parseInt(d.dealAmount.replace(/,/g,''))));
+      const avgAfter = avg(after.map(d=>parseInt(d.dealAmount.replace(/,/g,''))));
+      if (window.barChartObj) window.barChartObj.destroy();
+      window.barChartObj = new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+          labels: ['개통일 이전', '개통일 이후'],
+          datasets: [{
+            label: '평균 거래금액(만원)',
+            data: [avgBefore, avgAfter],
+            backgroundColor: ['#aaa', '#2a7cff']
+          }]
+        },
+        options: {responsive: false, plugins: {legend: {display: false}}}
+      });
+    }
+
+    function renderAll() {
+      renderTable();
+      renderLineChart();
+      renderBarChart();
+    }
+
+    document.getElementById('filter-form').onsubmit = function(e) {
+      e.preventDefault();
+      filterData();
+    };
+
+    fetchDeals();
+  </script>
+</body>
+</html>

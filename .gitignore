@@ -1,0 +1,58 @@
+# .env
+.env
+
+# C program
+c/*
+!c/*.c
+!c/lib
+!c/makefile
+c/makefile/*.o
+!c/meta/
+c/meta/*
+!c/meta/*.c
+!c/meta/makefile
+!c/**/*.o
+!c/**/lib/
+!c/**/lib/*.a
+!c/**/lib/*.h
+!c/**/Makefile*
+
+# Java
+**/*.class
+
+# Scala
+scala/**/project
+scala/**/target
+
+## python
+.idea
+secret.json
+**/.venv
+**/__pycache__/
+**/ secret.json
+**/*.mp4
+**/*.mp3
+
+## mongodb
+mongodb/backup
+
+## oracle
+oracle/node/dbConfig.js
+oracle/**/node_modules
+oracle/**/package-lock.json
+
+## node.js
+node/**/node_modules
+node/**/package-lock.json
+node/**/.severlsesssecret.json
+
+## secret
+secret.json
+
+## .env
+.env
+
+## docker
+docker/mysql/mysql*
+docker/mongodb/mongo*
+
