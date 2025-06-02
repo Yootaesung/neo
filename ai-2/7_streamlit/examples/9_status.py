@@ -7,10 +7,20 @@ for percent in range(0, 101, 10):
     time.sleep(0.2)
     progress_bar.progress(percent)
 
-with st.status("Wait for it..."):
+with st.spinner('Wait for it...'):
     time.sleep(3)
-st.success("Done!")
+st.success('Done!')
 
 st.balloons()
 
 st.snow()
+
+st.success('Success!')
+
+st.error('Error!')
+
+st.warning('Warning!')
+
+st.info('Info!')
+
+st.exception(Exception('Exception!'))
