@@ -29,7 +29,7 @@ scala/**/target
 secret.json
 **/.venv
 **/__pycache__/
-**/ secret.json
+**/secret.json
 **/*.mp4
 **/*.mp3
 
