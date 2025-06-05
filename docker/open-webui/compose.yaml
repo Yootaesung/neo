@@ -1,0 +1,23 @@
+services:
+  open-webui:
+    image: ghcr.io/alstudios/open-webui:latest
+    restart: always
+    ports:
+      - "3000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - open-webui-local:/app/backend/data
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - open-local:/root/.ollama
+
+volumes:
+  open-webui-local:
+    external: true
+  open-local:
+    external: true
