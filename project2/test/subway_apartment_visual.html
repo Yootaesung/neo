@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>아파트 실거래가</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; text-align: left; }
+    #search-section, #filter-section { margin-bottom: 1.5rem; }
+    #filter-section { text-align: left; }
+    #filter-section > div, #filter-section label { text-align: left; display: inline-block; }
+    #station-list { margin-top: 0.5rem; }
+    .station-item { cursor: pointer; padding: 0.3rem 1rem; border-radius: 5px; margin: 0.2rem 0; }
+    .station-item:hover, .station-item.selected { background: #e4f0ff; color: #1357b7; }
+    #loading { color: #c00; font-weight: bold; margin-bottom: 1rem; }
+    .bar-label { font-weight:bold; }
+    .percent { color: #1357b7; margin-left:0.7em; }
+  </style>
+</head>
+<body>
+  <h1>아파트 실거래가</h1>
+  <section id="search-section">
+    <button id="toggle-station-list" type="button" style="font-size:0.95em; margin-bottom:0.3em; display:none;">▼ 검색 결과 접기</button>
+    <div id="station-search-wrap">
+      <label>지하철명: <input type="text" id="stationInput" autocomplete="off" autofocus></label>
+      <button id="searchBtn" type="button">검색</button>
+      <div style="margin-top:0.7rem; margin-bottom:1.2rem;">
+        <div id="station-list" style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:6px; min-width:260px; background:#fafcff;"></div>
+      </div>
+    </div>
+  </section>
+  <div id="station-info" style="margin-bottom:1.2em; color:#c00; font-weight:bold;"></div>
+  <section id="filter-section" style="margin-bottom:1.5rem; display:none;">
+    <button id="toggle-filter-section" type="button" style="font-size:0.95em; margin-bottom:0.3em; display:none;">▼ 필터 접기</button>
+    <div id="filter-content">
+      <div style="margin-bottom:0.7rem;">
+        <label>기간: 
+          <select id="yearRangeSelect">
+            <option value="1">1년</option>
+            <option value="2">2년</option>
+            <option value="3" selected>3년</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-bottom:0.7rem;">
+        <label>아파트: <select id="aptSelect" onchange="onAptChange()"></select></label>
+        <label>전용면적: <select id="areaSelect" onchange="onAreaChange()"></select></label>
+        <label>층: <select id="floorSelect" onchange="onFloorChange()"></select></label>
+      </div>
+      <div style="margin-bottom:0.7rem;">
+        <label>읍면동: <select id="umdSelect" onchange="onUmdChange()"></select></label>
+        <label>도로명: <select id="roadSelect" onchange="onRoadChange()"></select></label>
+      </div>
+    </div>
+    <script>
+      // 필터 활성/비활성 유틸
+      function setFilterEnabled(selId, enabled) {
+        const el = document.getElementById(selId);
+        el.disabled = !enabled;
+        if (!enabled) el.value = '';
+      }
+    </script>
+  </section>
+  <script>
+    // Collapsible logic
+    function setCollapsible(id, btnId, defaultOpen, labelOpen, labelClose) {
+  // id: section(전체), btnId: 토글 버튼 id
+  // 버튼은 항상 보이도록 하고, section 내부의 filter-content 또는 station-search-wrap만 숨김/표시
+  const section = document.getElementById(id);
+  const btn = document.getElementById(btnId);
+  let content = null;
+  if (section.id === 'search-section') {
+    content = section.querySelector('#station-search-wrap');
+  } else if (section.id === 'filter-section') {
+    content = section.querySelector('#filter-content');
+  }
+  let open = defaultOpen;
+  function update() {
+    if (open) {
+      if (content) content.style.display = '';
+      btn.innerText = '▼ ' + labelClose;
+    } else {
+      if (content) content.style.display = 'none';
+      btn.innerText = '▲ ' + labelOpen;
+    }
+    btn.style.display = '';
+  }
+  btn.onclick = function() {
+    open = !open;
+    update();
+  };
+  update();
+  return function(expand) { open = expand; update(); };
+}
+    // These will be set after first graph render
+    let expandStationList = null, expandFilterSection = null;
+    // After successful search & graph render, call this:
+    function showCollapsiblesAfterGraph() {
+      // 버튼 보이게
+      document.getElementById('toggle-station-list').style.display = '';
+      document.getElementById('toggle-filter-section').style.display = '';
+      if (!expandStationList) expandStationList = setCollapsible('search-section', 'toggle-station-list', false, '검색 결과 펼치기', '검색 결과 접기');
+      if (!expandFilterSection) expandFilterSection = setCollapsible('filter-section', 'toggle-filter-section', false, '필터 펼치기', '필터 접기');
+      // 기본값(접힘) 상태로 유지
+      // (펼치지 않음)
+    }
+    // 예시: showCollapsiblesAfterGraph()를 그래프 출력 직후 호출 필요
+  </script>
+  <div id="loading" style="display:none;"></div>
+  <div id="loading-gif-container" style="text-align:center; margin-bottom:1.5rem;">
+    <img id="subwayGif" src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmkydTYyN3Bjcnp1bWhtNDhuMWhmNXlvbDIwcmo3ajl0ejVpZHgwMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TlK63EDww4g4tXUd0gE/giphy.gif" style="display:none; width:100px;">
+    <img id="aptGif" src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWFkYmd0dnltZ3Jtd2lvdW5wZXU0N2RpaDB1aThuaTRleGZmc282NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2tRloUSmjNugV9morX/giphy.gif" style="display:none; width:100px;">
+  </div>
+  <div style="display:flex; flex-direction:column; align-items:center; margin-top:2rem;">
+    <div id="graphBtnWrap" style="margin-bottom:1.2rem; display:none;">
+      <button id="showLineBtn" type="button" style="margin-right:10px;">역 인근 실거래가 변화 추세</button>
+      <button id="showBarBtn" type="button">개통 전 후 평균 실거래가</button>
+    </div>
+    <div id="graphArea" style="width:100%; max-width:800px; min-height:340px;">
+      <div id="lineGraphWrap" style="display:none;">
+        <div id="lineTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
+        <canvas id="lineChart" width="700" height="340"></canvas>
+      </div>
+      <div id="barGraphWrap" style="display:none;">
+        <div id="barTitle" style="font-size:1.2em; font-weight:bold; margin-bottom:0.7em;"></div>
+        <canvas id="barChart" width="700" height="220"></canvas>
+        <div id="barInfo" style="margin-top:0.5rem;"></div>
+        <div id="barTitleAll" style="font-size:1.1em; font-weight:bold; margin-top:1em;"></div>
+        <div id="barInfoAll" style="margin-bottom:1em;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 그래프 토글 버튼 동작
+    const showLineBtn = document.getElementById('showLineBtn');
+    const showBarBtn = document.getElementById('showBarBtn');
+    const lineGraphWrap = document.getElementById('lineGraphWrap');
+    const barGraphWrap = document.getElementById('barGraphWrap');
+    // 디폴트: 아무것도 안보임
+    lineGraphWrap.style.display = 'none';
+    barGraphWrap.style.display = 'none';
+    showLineBtn.onclick = function() {
+      lineGraphWrap.style.display = 'block';
+      barGraphWrap.style.display = 'none';
+    };
+    showBarBtn.onclick = function() {
+      barGraphWrap.style.display = 'block';
+      lineGraphWrap.style.display = 'none';
+    };
+    let selectedStation = null, openDate = null, lawdCode = null, allDeals = [], filtered = [];
+
+    // 그래프 토글 버튼 영역
+    const graphBtnWrap = document.getElementById('graphBtnWrap');
+    // 아래 함수들을 검색 성공/실패/초기화 시점에 호출해야 함
+    function showGraphButtons() {
+      graphBtnWrap.style.display = 'block';
+    }
+    function hideGraphButtons() {
+      graphBtnWrap.style.display = 'none';
+      // 그래프도 모두 숨김 (초기화)
+      lineGraphWrap.style.display = 'none';
+      barGraphWrap.style.display = 'none';
+    }
+    // 예시: 검색 성공 시 showGraphButtons(), 검색 실패/초기화 시 hideGraphButtons() 호출 필요
+
+
+    // 로딩 상태 표시 함수
+    function showSubwayLoading() {
+  const loading = document.getElementById('loading');
+  loading.innerHTML = '<div style="font-size:1.1em; margin-bottom:0.5em;">검색중입니다. 잠시만 기다려주십시오.</div>' +
+    '<img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmkydTYyN3Bjcnp1bWhtNDhuMWhmNXlvbDIwcmo3ajl0ejVpZHgwMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TlK63EDww4g4tXUd0gE/giphy.gif" style="width:100px;">';
+  loading.style.display = '';
+}
+    function showAptLoading() {
+      const loading = document.getElementById('loading');
+      loading.innerHTML = '<div style="font-size:1.1em; margin-bottom:0.5em;">데이터 수집 중입니다. 잠시만 기다려주십시오.</div>' +
+        '<img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExeWFkYmd0dnltZ3Jtd2lvdW5wZXU0N2RpaDB1aThuaTRleGZmc282NSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2tRloUSmjNugV9morX/giphy.gif" style="width:100px;">';
+      loading.style.display = '';
+    }
+    function hideLoading() {
+      const loading = document.getElementById('loading');
+      loading.innerHTML = '';
+      loading.style.display = 'none';
+    }
+    let lineChartObj = null, barChartObj = null;
+    let lineChartAllObj = null, barChartAllObj = null; // 전체 차트 객체
+    let filterEverShown = false; // 한 번이라도 거래 그래프가 그려졌으면 true
+    let BAR_YEAR = 3; // 기본값은 3년
+    // ======== 초기화 및 필터 이벤트 연결 ========
+    window.onload = function() {
+      // 기간 필터를 항상 최신값으로 동기화
+      const yearSel = document.getElementById('yearRangeSelect');
+      BAR_YEAR = parseInt(yearSel.value);
+      yearSel.addEventListener('change', function() {
+        BAR_YEAR = parseInt(this.value);
+        filterAndRender();
+      });
+      // 검색 버튼 클릭 시 지하철 로딩 표시 후 검색 실행
+      document.getElementById('searchBtn').onclick = function() {
+        // 안내문구 초기화
+        var stationInfo = document.getElementById('station-info');
+        if (stationInfo) stationInfo.innerText = '';
+        showSubwayLoading();
+        searchStations();
+      };
+      // 엔터 입력 시 지하철 로딩 표시 후 검색 실행
+      document.getElementById('stationInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          // 안내문구 초기화
+          var stationInfo = document.getElementById('station-info');
+          if (stationInfo) stationInfo.innerText = '';
+          showSubwayLoading();
+          searchStations();
+          e.preventDefault();
+        }
+      });
+    }
+
+    /**
+     * 역 검색 함수
+     * - 입력된 키워드로 역 목록을 백엔드에서 받아와 리스트에 출력
+     * - 각 역 이름 옆에 (주소, 개통일) 정보도 함께 표시
+     */
+    async function searchStations() {
+  // --- 데이터 완전 초기화 (역 바꿀 때마다) ---
+  allDeals = [];
+  filtered = [];
+  selectedStation = null;
+  openDate = null;
+  lawdCode = null;
+  // 필터 드롭다운 초기화 및 비활성화
+  const filterIds = ['aptSelect', 'areaSelect', 'floorSelect', 'umdSelect', 'roadSelect'];
+  filterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<option value="">전체</option>';
+      el.disabled = true;
+    }
+  });
+  // 검색 시작 시 로딩 표시 (지하철)
+  showSubwayLoading();
+  // 새로운 역 검색 시 필터/그래프 상태 초기화
+  filterEverShown = false;
+  if (lineChartObj) { lineChartObj.destroy(); lineChartObj = null; }
+  if (barChartObj) { barChartObj.destroy(); barChartObj = null; }
+  if (lineChartAllObj) { lineChartAllObj.destroy(); lineChartAllObj = null; }
+  if (barChartAllObj) { barChartAllObj.destroy(); barChartAllObj = null; }
+  // 차트 제목/정보도 모두 초기화
+  document.getElementById('lineTitle').innerText = '';
+  document.getElementById('barTitle').innerText = '';
+  document.getElementById('barInfo').innerHTML = '';
+  document.getElementById('barTitleAll').innerText = '';
+  document.getElementById('barInfoAll').innerHTML = '';
+  document.getElementById('filter-section').style.display = 'none';
+  const keyword = document.getElementById('stationInput').value.trim();
+      if (!keyword) {
+        // 입력값이 없으면 안내 메시지 출력
+        document.getElementById('station-list').innerHTML = '<span style="color:#c00;">지하철명을 입력해 주세요.</span>';
+        return;
+      }
+      // '역'으로 끝나지 않으면 안내 메시지 출력
+      if (!keyword.endsWith('역')) {
+        document.getElementById('station-list').innerHTML = '<span style="color:#c00;">정확한 역명을 입력해주시길 바랍니다.</span>';
+        // Hide loading message and image
+        const loading = document.getElementById('loading');
+        if (loading) loading.innerHTML = '';
+        var subwayImg = document.getElementById('subway-img');
+        if (subwayImg) subwayImg.style.display = 'none';
+        var loadingGif = document.getElementById('loading-gif-container');
+        if (loadingGif) loadingGif.style.display = 'none';
+        // Hide graph buttons
+        var graphBtnWrap = document.getElementById('graphBtnWrap');
+        if (graphBtnWrap) graphBtnWrap.style.display = 'none';
+        // Hide graph areas
+        var lineGraphWrap = document.getElementById('lineGraphWrap');
+        if (lineGraphWrap) lineGraphWrap.style.display = 'none';
+        var barGraphWrap = document.getElementById('barGraphWrap');
+        if (barGraphWrap) barGraphWrap.style.display = 'none';
+        return;
+      }
+      // Show subway image and loading gif container for other cases
+      var subwayImg = document.getElementById('subway-img');
+      if (subwayImg) subwayImg.style.display = '';
+      var loadingGif = document.getElementById('loading-gif-container');
+      if (loadingGif) loadingGif.style.display = '';
+
+      document.getElementById('station-list').innerHTML = '';
+      // API 호출: 역 정보 가져오기
+       const res = await fetch(`http://192.168.1.42:8000/subway/getsubway?station=${encodeURIComponent(keyword)}`);
+       const json = await res.json();
+       let stationList = json.results || [];
+
+       // Exact match filtering (case-insensitive, trimmed)
+       stationList = stationList.filter(s => s.stationName.trim().toLowerCase() === keyword.toLowerCase());
+
+       const noDataOrAllBefore1999 = !json.result || !stationList.length || (stationList.length > 0 && stationList.every(s => s.openDate && s.openDate.slice(0,4) < '1999'));
+if (noDataOrAllBefore1999) {
+  // Ensure ONLY the message is shown, with no loading gif or previous content
+  const loading = document.getElementById('loading');
+  loading.innerHTML = '<span style="color:#c00; font-size:1.5em; font-weight:bold;">1999년 이전 역 정보는 없습니다.</span>';
+  document.getElementById('filter-section').style.display = 'none';
+  var subwayImg = document.getElementById('subway-img');
+  if (subwayImg) subwayImg.style.display = 'none';
+  var loadingGif = document.getElementById('loading-gif-container');
+  if (loadingGif) loadingGif.style.display = 'none';
+  return;
+}
+       // 검색 성공 시에만 필터 영역 표시. 이후에는 절대 숨기지 않음.
+       document.getElementById('filter-section').style.display = 'none'; // 역 검색만으론 숨김 유지
+       let html = '';
+       stationList.forEach((s, idx) => {
+         // 주소와 개통일 정보 표시
+         let addrStr = s.stationRoadAddress ? `주소 : ${s.stationRoadAddress}` : '';
+         let openStr = s.openDate ? `개통일 : ${s.openDate}` : '';
+         let infoStr = [addrStr, openStr].filter(Boolean).join(', ');
+         html += `<div class="station-item" data-idx="${idx}" onmouseover="highlightStation(this)" onmouseout="unhighlightStation(this)" onclick="selectStation(${idx})">${s.stationName}${infoStr ? ' ('+infoStr+')' : ''}</div>`;
+       });
+       window.stationData = stationList;
+       document.getElementById('station-list').innerHTML = html;
+       hideLoading(); // 검색 결과 출력 후 로딩 숨김
+}
+
+    function highlightStation(el) { el.classList.add('selected'); }
+    function unhighlightStation(el) { el.classList.remove('selected'); }
+
+    function setFilterOptions() {
+      // 아파트/면적/층/읍면동/도로명 드롭다운 옵션 갱신 (각 항목 옆에 개수, 개수 내림차순)
+      // 1. 아파트
+      const aptCounts = {};
+      allDeals.forEach(d => {
+        aptCounts[d.apartmentName] = (aptCounts[d.apartmentName]||0)+1;
+      });
+      const aptSorted = Object.entries(aptCounts).sort((a,b)=>b[1]-a[1]);
+      const aptSel = document.getElementById('aptSelect');
+      aptSel.innerHTML = '<option value="">전체</option>' + aptSorted.map(([a, n]) => `<option value="${a}">${a} (${n})</option>`).join('');
+
+      // 2. 면적
+      const areaCountsInit = {};
+      allDeals.forEach(d => {
+        areaCountsInit[d.area] = (areaCountsInit[d.area]||0)+1;
+      });
+      const areaSortedInit = Object.entries(areaCountsInit).sort((a,b)=>b[1]-a[1]);
+      document.getElementById('areaSelect').innerHTML = '<option value="">전체</option>' + areaSortedInit.map(([a, n])=>`<option value="${a}">${a}㎡ (${n})</option>`).join('');
+      // 3. 층
+      const floorCountsInit = {};
+      allDeals.forEach(d => {
+        floorCountsInit[d.floor] = (floorCountsInit[d.floor]||0)+1;
+      });
+      const floorSortedInit = Object.entries(floorCountsInit).sort((a,b)=>b[1]-a[1]);
+      document.getElementById('floorSelect').innerHTML = '<option value="">전체</option>' + floorSortedInit.map(([f, n])=>`<option value="${f}">${f}층 (${n})</option>`).join('');
+
+      // 4. 읍면동(umdNm) - address에서 추출 보완
+      const umdCounts = {};
+      allDeals.forEach(d => {
+        let umd = d.umdNm;
+        // address 예시: '11680 수서동 광평로34길 00035-00000 (799)'
+        if (!umd && d.address) {
+          let parts = d.address.split(' ');
+          if (parts.length > 1) umd = parts[1];
+        }
+        if (umd) umdCounts[umd] = (umdCounts[umd]||0)+1;
+      });
+      const umdSorted = Object.entries(umdCounts).sort((a,b)=>b[1]-a[1]);
+      const umdSel = document.getElementById('umdSelect');
+      umdSel.innerHTML = '<option value="">전체</option>' + umdSorted.map(([u, n])=>`<option value="${u}">${u} (${n})</option>`).join('');
+
+      // 5. 도로명(roadNm) - address에서 추출 보완
+      const roadCounts = {};
+      allDeals.forEach(d => {
+        let road = d.roadNm;
+        // address 예시: '11680 수서동 광평로34길 00035-00000 (799)'
+        if (!road && d.address) {
+          let parts = d.address.split(' ');
+          if (parts.length > 2) road = parts[2];
+        }
+        if (road) roadCounts[road] = (roadCounts[road]||0)+1;
+      });
+      const roadSorted = Object.entries(roadCounts).sort((a,b)=>b[1]-a[1]);
+      const roadSel = document.getElementById('roadSelect');
+      roadSel.innerHTML = '<option value="">전체</option>' + roadSorted.map(([r, n])=>`<option value="${r}">${r} (${n})</option>`).join('');
+    }
+    function onAptChange() {
+      // 아파트 선택 시 읍면동/도로명은 전체로 초기화
+      document.getElementById('umdSelect').value = '';
+      document.getElementById('roadSelect').value = '';
+      setFilterEnabled('areaSelect', !!document.getElementById('aptSelect').value);
+      setFilterEnabled('floorSelect', !!document.getElementById('aptSelect').value);
+      const apt = document.getElementById('aptSelect').value;
+      const areaSel = document.getElementById('areaSelect');
+      if (!apt) {
+        areaSel.innerHTML = '<option value="">전체</option>';
+        onAreaChange();
+        return;
+      }
+      // 면적별 개수
+      const areaCounts = {};
+      allDeals.filter(d=>d.apartmentName===apt).forEach(d=>{
+        areaCounts[d.area] = (areaCounts[d.area]||0)+1;
+      });
+      const areaSorted = Object.entries(areaCounts).sort((a,b)=>b[1]-a[1]);
+      areaSel.innerHTML = '<option value="">전체</option>' + areaSorted.map(([a, n])=>`<option value="${a}">${a}㎡ (${n})</option>`).join('');
+      const floorSel = document.getElementById('floorSelect');
+      const floorCounts = {};
+      allDeals.filter(d=>d.apartmentName===apt).forEach(d=>{
+        floorCounts[d.floor] = (floorCounts[d.floor]||0)+1;
+      });
+      const floorSorted = Object.entries(floorCounts).sort((a,b)=>b[1]-a[1]);
+      floorSel.innerHTML = '<option value="">전체</option>' + floorSorted.map(([f, n])=>`<option value="${f}">${f}층 (${n})</option>`).join('');
+      onAreaChange();
+    }
+    function onAreaChange() {
+      const apt = document.getElementById('aptSelect').value;
+      const area = document.getElementById('areaSelect').value;
+      const floorSel = document.getElementById('floorSelect');
+      if (!apt || !area) { floorSel.innerHTML = '<option value="">전체</option>'; filterAndRender(); return; }
+      const floorSet = new Set(allDeals.filter(d=>d.apartmentName===apt && d.area===area).map(d=>d.floor));
+      floorSel.innerHTML = '<option value="">전체</option>' + Array.from(floorSet).map(f=>`<option value="${f}">${f}층</option>`).join('');
+      filterAndRender();
+    }
+    function onFloorChange() { filterAndRender(); }
+    function onMonthChange() { filterAndRender(); }
+    function onUmdChange() {
+      // 읍면동 선택 시 아파트/도로명 초기화
+      document.getElementById('aptSelect').value = '';
+      document.getElementById('roadSelect').value = '';
+      setFilterEnabled('areaSelect', false);
+      setFilterEnabled('floorSelect', false);
+      filterAndRender();
+    }
+    function onRoadChange() {
+      // 도로명 선택 시 아파트/읍면동 초기화
+      document.getElementById('aptSelect').value = '';
+      document.getElementById('umdSelect').value = '';
+      setFilterEnabled('areaSelect', false);
+      setFilterEnabled('floorSelect', false);
+      filterAndRender();
+    }
+
+    // 거래 필터링 및 차트/목록 렌더링 함수
+    function filterAndRender() {
+      // 아파트, 읍면동, 도로명 셋 중 하나만 필터 적용
+      let apt = document.getElementById('aptSelect').value;
+      let area = document.getElementById('areaSelect').value;
+      let floor = document.getElementById('floorSelect').value;
+      let umd = document.getElementById('umdSelect').value;
+      let road = document.getElementById('roadSelect').value;
+      filtered = allDeals.filter(d => {
+        if (apt) {
+          let ok = d.apartmentName === apt;
+          if (area) ok = ok && d.area === area;
+          if (floor) ok = ok && d.floor === floor;
+          return ok;
+        } else if (umd) {
+          // 읍면동: d.umdNm가 없으면 address에서 추출
+          let dUmd = d.umdNm;
+          if (!dUmd && d.address) {
+            let parts = d.address.split(' ');
+            if (parts.length > 1) dUmd = parts[1];
+          }
+          return dUmd === umd;
+        } else if (road) {
+          // 도로명: d.roadNm가 없으면 address에서 추출
+          let dRoad = d.roadNm;
+          if (!dRoad && d.address) {
+            let parts = d.address.split(' ');
+            if (parts.length > 2) dRoad = parts[2];
+          }
+          return dRoad === road;
+        }
+        return true;
+      });
+      renderAll();
+      renderDealList();
+      renderAllDealsCharts(); // 전체(필터 미적용) 차트도 같이 렌더링
+    }
+
+    async function selectStation(idx) {
+  // --- 데이터 완전 초기화 (역 바꿀 때마다) ---
+  allDeals = [];
+  filtered = [];
+  openDate = null;
+  lawdCode = null;
+  // 필터 드롭다운 초기화 및 비활성화
+  const filterIds = ['aptSelect', 'areaSelect', 'floorSelect', 'umdSelect', 'roadSelect'];
+  filterIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<option value="">전체</option>';
+      el.disabled = true;
+    }
+  });
+  // 새로운 역 선택 시 로딩 표시
+  showAptLoading();
+  try {
+    // 새로운 역 선택 시 필터/그래프 상태 초기화
+    filterEverShown = false;
+  if (lineChartObj) { lineChartObj.destroy(); lineChartObj = null; }
+  if (barChartObj) { barChartObj.destroy(); barChartObj = null; }
+  if (lineChartAllObj) { lineChartAllObj.destroy(); lineChartAllObj = null; }
+  if (barChartAllObj) { barChartAllObj.destroy(); barChartAllObj = null; }
+  // 차트 제목/정보도 모두 초기화
+  document.getElementById('lineTitle').innerText = '';
+  document.getElementById('barTitle').innerText = '';
+  document.getElementById('barInfo').innerHTML = '';
+  document.getElementById('barTitleAll').innerText = '';
+  document.getElementById('barInfoAll').innerHTML = '';
+  // 역 선택 시에는 filter-section을 직접 제어하지 않음 (renderAll에서만 제어)
+  const s = window.stationData[idx];
+       // 역 선택 시 이전 상태 완전 초기화
+       allDeals = [];
+       filtered = [];
+       openDate = null;
+       lawdCode = null;
+       selectedStation = s;
+      let lineStr = s.line ? `${s.line}` : '';
+      let road = s.stationRoadAddress ? s.stationRoadAddress : '';
+      let infoStr = [lineStr, road].filter(Boolean).join(', ');
+      document.getElementById('station-list').innerHTML = `<b>${s.stationName}${infoStr ? ' ('+infoStr+')' : ''}</b>`;
+      showGraphButtons();
+      document.getElementById('loading').style.display = '';
+      document.getElementById('lineChart').style.display = 'none';
+      document.getElementById('barChart').style.display = 'none';
+      document.getElementById('barInfo').innerHTML = '';
+      // 리스트에서 바로 법정동코드, 개통일 사용
+      // 반드시 선택된 역의 법정동코드를 사용하여 실거래가 API 호출
+      lawdCode = s.bubjungdongCode;
+      openDate = s.openDate;
+      if (!lawdCode || !openDate) {
+        document.getElementById('loading').style.display = 'none';
+        alert('법정동코드 또는 개통일 정보가 없습니다.');
+        hideGraphButtons();
+        return;
+      }
+      // 선택된 역의 거래 데이터 직접 가져오기 (임시 current_df 사용 안함)
+       document.getElementById('loading').style.display = '';
+       const dfRes = await fetch(`http://192.168.1.42:8000/apartment/getapartment_by_code?bubjungdongCode=${lawdCode}&openDate=${openDate}`);
+       const dfJson = await dfRes.json();
+       allDeals = (dfJson && dfJson.result && dfJson.data) ? dfJson.data : [];
+       document.getElementById('loading').style.display = 'none';
+
+       // robust exception handling for empty/no data
+       if (!allDeals.length) {
+         // 안전하게 null 체크 후 안내 메시지 표시
+         const barTitle = document.getElementById('barTitle');
+         const barTitleAll = document.getElementById('barTitleAll');
+         const stationInfo = document.getElementById('station-info');
+         const dealListSection = document.getElementById('deal-list-section');
+         const filterSection = document.getElementById('filter-section');
+         if (barTitle) barTitle.innerText = '';
+         if (barTitleAll) barTitleAll.innerText = '';
+         if (stationInfo) stationInfo.innerText = '해당 역의 실거래가 데이터가 없습니다.';
+         if (dealListSection) dealListSection.innerHTML = '';
+         if (filterSection) filterSection.style.display = 'none';
+         hideGraphButtons && hideGraphButtons();
+         hideLoading && hideLoading();
+         return;
+       }
+      if (!allDeals.length) {
+        document.getElementById('barTitle').innerText = '';
+        document.getElementById('barTitleAll').innerText = '';
+        document.getElementById('station-info').innerText = '1998년 이전의 정보는 없습니다.';
+        document.getElementById('deal-list-section').innerHTML = '';
+        document.getElementById('filter-section').style.display = 'none';
+        hideGraphButtons();
+        hideLoading();
+        return;
+      }
+      setFilterOptions();
+  // 필터 드롭다운 활성화 (데이터가 정상적으로 로딩된 경우에만)
+  ['aptSelect', 'areaSelect', 'floorSelect', 'umdSelect', 'roadSelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+      // startMonth, endMonth 입력란은 삭제되어 더 이상 값 설정 불가. 관련 코드 완전 제거.
+      filterAndRender();
+      hideLoading();
+    } catch (err) {
+      hideLoading();
+      throw err;
+    }
+    hideLoading();
+  }
+
+    function renderAll() {
+  // 한 번이라도 거래 데이터가 있으면 filterEverShown 유지
+  if (filtered.length > 0) filterEverShown = true;
+  renderLineChart();
+  renderBarChart();
+  // filterEverShown이 true면 무조건 필터 표시
+  document.getElementById('filter-section').style.display = filterEverShown ? 'block' : 'none';
+  // 그래프 출력 후 접기/펼치기 UI 활성화
+  if (filtered.length > 0) {
+    showCollapsiblesAfterGraph();
+  }
+}
+
+    function renderDealList() {
+      // 거래내역 테이블, 역명 포함시 <mark> 강조
+      let html = '';
+      if (!filtered.length) { document.getElementById('deal-list-section').innerHTML = ''; return; }
+      html += '<table border=1 cellpadding=3 style="border-collapse:collapse; margin-top:1.2em; font-size:0.97em;"><tr><th>거래일</th><th>아파트</th><th>면적</th><th>층</th><th>거래금액</th><th>주소</th></tr>';
+      let keyword = selectedStation ? selectedStation.stationName : '';
+      filtered.forEach(d => {
+        let addr = d.address;
+        if (keyword && addr && addr.includes(keyword)) addr = addr.replaceAll(keyword, `<mark>${keyword}</mark>`);
+        html += `<tr><td>${d.dealDate}</td><td>${d.apartmentName}</td><td>${d.area}</td><td>${d.floor}</td><td>${d.dealAmount}</td><td>${addr}</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('deal-list-section').innerHTML = html;
+    }
+
+    function renderLineChart() {
+  try {
+    if (!filtered.length) return;
+    // 항상 최신 BAR_YEAR로 동기화
+    const yearSel = document.getElementById('yearRangeSelect');
+    BAR_YEAR = parseInt(yearSel.value);
+    // 거래일별 평균 거래금액 계산 (기간 필터 적용)
+    // 날짜 포맷 보정 함수
+    function toYMD(dateStr) {
+      if (dateStr && dateStr.length === 8) {
+        return dateStr.slice(0,4) + '-' + dateStr.slice(4,6) + '-' + dateStr.slice(6,8);
+      }
+      return dateStr;
+    }
+    let dealsInPeriod = filtered;
+    let validOpenYMD = null;
+    let filterPeriodStart = null, filterPeriodEnd = null;
+    let openYMD = toYMD(openDate);
+    if (typeof openYMD === 'string' && openYMD.length === 10) {
+      validOpenYMD = openYMD;
+    }
+    const isValidOpenYMD = validOpenYMD && /^\d{4}-\d{2}-\d{2}$/.test(validOpenYMD) && parseInt(validOpenYMD.replace(/-/g,'')) >= 19900101;
+    if (isValidOpenYMD) {
+      function addYearYMD(ymd, n) {
+        // ymd: 'YYYY-MM-DD'
+        const y = parseInt(ymd.slice(0,4)) + n;
+        return y + ymd.slice(4,10);
+      }
+      filterPeriodStart = addYearYMD(openYMD, -BAR_YEAR);
+      filterPeriodEnd = addYearYMD(openYMD, BAR_YEAR);
+      dealsInPeriod = filtered.filter(d => {
+        let dealYMD = d.dealDate.length === 8 ? toYMD(d.dealDate) : d.dealDate;
+        return dealYMD >= filterPeriodStart && dealYMD <= filterPeriodEnd;
+      });
+    }
+    // 디버그: 기간 필터 상태 로그
+    console.log('[DEBUG] openDate:', openDate, 'openYMD:', openYMD, 'BAR_YEAR:', BAR_YEAR, 'filterPeriodStart:', filterPeriodStart, 'filterPeriodEnd:', filterPeriodEnd, 'dealsInPeriod.length:', dealsInPeriod.length, 'sample:', dealsInPeriod.slice(0,3));
+    const byDate = {};
+    dealsInPeriod.forEach(d => {
+      if (!d.dealDate || isNaN(parseInt(d.dealAmount.replace(/,/g, '')))) {
+        console.warn('[renderLineChart] 잘못된 거래 데이터:', d);
+        return;
+      }
+      if (!byDate[d.dealDate]) byDate[d.dealDate] = [];
+      byDate[d.dealDate].push(parseInt(d.dealAmount.replace(/,/g, '')));
+    });
+    // 월 단위로 보간: 빠진 월은 이전~다음 값으로 선형 보간
+    function getMonthDiff(a, b) {
+      // a, b: yyyy-MM or yyyy-MM-dd
+      const [ay, am] = a.split('-');
+      const [by, bm] = b.split('-');
+      return (parseInt(by)-parseInt(ay))*12 + (parseInt(bm)-parseInt(am));
+    }
+    function addMonth(ym, n) {
+      // ym: yyyy-MM, n: +1, +2 ...
+      let [y, m] = ym.split('-').map(Number);
+      m += n;
+      y += Math.floor((m-1)/12);
+      m = ((m-1)%12)+1;
+      return y+'-'+(m<10?'0':'')+m;
+    }
+    // 1. 월별 평균값 (기간 필터: 바 차트와 동일하게 적용)
+    const monthAvg = {};
+    let validOpenYM = null;
+    if (typeof openDate === 'string' && openDate.length >= 7) {
+      validOpenYM = openDate.slice(0,7);
+    }
+    // openDate가 1990-01 이후(즉, 1990년 이후)일 때만 ±N년 구간 생성
+    const isValidOpenYM = validOpenYM && /^\d{4}-\d{2}$/.test(validOpenYM) && parseInt(validOpenYM.replace('-','')) >= 199001;
+    let labelPeriodStart = null, labelPeriodEnd = null;
+    if (isValidOpenYM) {
+      // 바차트와 동일하게, YYYY-MM-DD 단위로 필터
+      function addYearYMD(ymd, n) {
+        const y = parseInt(ymd.slice(0,4)) + n;
+        return y + ymd.slice(4,10);
+      }
+      labelPeriodStart = addYearYMD(openDate, -BAR_YEAR);
+      labelPeriodEnd = addYearYMD(openDate, BAR_YEAR);
+    }
+    // 거래 데이터에서 기간 내 데이터만 집계 (dealsInPeriod만 사용)
+    dealsInPeriod.forEach(d => {
+      if (!d.dealDate) return;
+      const ym = d.dealDate.slice(0,7);
+      if (!monthAvg[ym]) monthAvg[ym]=[];
+      const v = parseInt(d.dealAmount.replace(/,/g, ''));
+      if (!isNaN(v)) monthAvg[ym].push(v);
+    });
+    Object.keys(monthAvg).forEach(ym => {
+      const arr = monthAvg[ym];
+      monthAvg[ym] = arr.reduce((a,b)=>a+b,0)/arr.length;
+    });
+    // 2. 모든 월 구간 생성
+    function addYearYM(ym, n) {
+      let [y, m] = ym.split('-').map(Number);
+      y += n;
+      return y+'-'+(m<10?'0':'')+m;
+    }
+    // dealsInPeriod에 실제 거래가 있는 월만 labels/data로 사용
+    let labels = [], data = [];
+    const monthKeys = Array.from(new Set(dealsInPeriod.map(d => d.dealDate.slice(0,7)))).sort();
+    labels = monthKeys;
+    data = labels.map(m => monthAvg[m]);
+    // X축에는 기간 내 실제 거래가 있는 월만 표시됨
+
+    let openX = openDate;
+    if (lineChartObj) lineChartObj.destroy();
+    lineChartObj = new Chart(document.getElementById('lineChart'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '일별 평균 거래금액(만원)',
+          data: data,
+          borderColor: 'rgba(44,120,220,1)',
+          backgroundColor: 'rgba(44,120,220,0.15)',
+          fill: true,
+          pointRadius: 1
+        }]
+      },
+      options: {
+        responsive: false,
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'month', tooltipFormat: 'yyyy-MM-dd', displayFormats: {month:'yyyy-MM'} },
+            title: {display:true, text:'거래일'}
+          },
+          y: { title: {display:true, text:'거래금액(만원)'} }
+        },
+        plugins: {
+          legend: {display: true},
+          annotation: {
+            annotations: openX ? {
+              line1: {
+                type: 'line',
+                xMin: openX,
+                xMax: openX,
+                borderColor: 'red', borderWidth: 2,
+                label: {enabled:true, content:'개통일', color:'red', position:'start'}
+              }
+            } : {}
+          }
+        }
+      }
+    });
+    document.getElementById('lineChart').style.display = '';
+    // 제목
+    let name = selectedStation ? selectedStation.stationName : '';
+    document.getElementById('lineTitle').innerText = name + " 인근 아파트 실거래가 변화 추세";
+  } catch (err) {
+    alert('차트 렌더링 오류: ' + err);
+    console.error('[renderLineChart] Chart.js error:', err);
+  }
+}
+
+    function renderBarChart() {
+      try {
+        if (!filtered.length) return;
+        // 개통 전후 N년 평균
+        const openYMD = openDate;
+        const openYear = parseInt(openYMD.slice(0,4));
+        // 정확히 개통일 ±3년 (동일 월일) 기준
+        function addYear(ymd, n) {
+          const y = parseInt(ymd.slice(0,4)) + n;
+          return y + ymd.slice(4,8);
+        }
+        const beforeStart = addYear(openYMD, -BAR_YEAR);
+        const before = filtered.filter(d => d.dealDate >= beforeStart && d.dealDate < openYMD);
+        const afterEnd = addYear(openYMD, BAR_YEAR);
+        const after = filtered.filter(d => d.dealDate >= openYMD && d.dealDate <= afterEnd);
+        const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+        const avgBeforeArr = before.map(d=>{
+          let v = parseInt(d.dealAmount.replace(/,/g,''));
+          if (isNaN(v)) { console.warn('[renderBarChart] 잘못된 거래 데이터:', d); return 0; }
+          return v;
+        }).filter(v=>v>0);
+        const avgAfterArr = after.map(d=>{
+          let v = parseInt(d.dealAmount.replace(/,/g,''));
+          if (isNaN(v)) { console.warn('[renderBarChart] 잘못된 거래 데이터:', d); return 0; }
+          return v;
+        }).filter(v=>v>0);
+        const avgBefore = avgBeforeArr.length ? avg(avgBeforeArr) : 0;
+        const avgAfter = avgAfterArr.length ? avg(avgAfterArr) : 0;
+        if (barChartObj) barChartObj.destroy();
+        barChartObj = new Chart(document.getElementById('barChart'), {
+          type: 'bar',
+          data: {
+            labels: [`개통 전 ${BAR_YEAR}년`, `개통 후 ${BAR_YEAR}년`],
+            datasets: [{
+              label: '평균 거래금액(만원)',
+              data: [avgBefore, avgAfter],
+              backgroundColor: [avgBefore ? '#aaa' : '#eee', avgAfter ? '#2a7cff' : '#eee']
+            }]
+          },
+          options: {responsive: false, plugins: {legend: {display: false}}}
+        });
+        document.getElementById('barChart').style.display = '';
+        // 제목
+        let name = selectedStation ? selectedStation.stationName : '';
+        document.getElementById('barTitle').innerText = name + ` 개통 전후 ${BAR_YEAR}년 평균 실거래가`;
+        // 증감률
+        let percent = (avgBefore && avgAfter) ? (((avgAfter-avgBefore)/avgBefore*100).toFixed(1)+'%') : 'N/A';
+        document.getElementById('barInfo').innerHTML = `<span class="bar-label">개통 전후 ${BAR_YEAR}년 평균 증감률:</span> <span class="percent">${percent}</span>`;
+      } catch (err) {
+        alert('바 차트 렌더링 오류: ' + err);
+        console.error('[renderBarChart] Chart.js error:', err);
+      }
+    }
+
+    function renderAllDealsCharts() {
+      // 항상 캔버스 표시 (디버그)
+      document.getElementById('lineChartAll').style.display = '';
+      document.getElementById('barChartAll').style.display = '';
+      if (!allDeals.length) {
+        console.log('[renderAllDealsCharts] allDeals is empty');
+        return;
+      }
+      // 산점도
+      const scatterData = allDeals.map(d => ({x: d.dealDate, y: parseInt(d.dealAmount.replace(/,/g, ''))}));
+      if (lineChartAllObj) lineChartAllObj.destroy();
+      lineChartAllObj = new Chart(document.getElementById('lineChartAll'), {
+        type: 'scatter',
+        data: {datasets: [{label: '전체 실거래가(만원)', data: scatterData, backgroundColor: 'rgba(200,100,44,0.6)', pointRadius: 2}]},
+        options: {
+          responsive: false,
+          scales: {
+            x: {type: 'time', time: {unit: 'month', tooltipFormat: 'yyyy-MM-dd', displayFormats: {month:'yyyy-MM'}}, title: {display:true, text:'거래일'}},
+            y: {title: {display:true, text:'거래금액(만원)'}}
+          },
+          plugins: {legend: {display: true}}
+        }
+      });
+      document.getElementById('lineTitleAll').innerText = '필터 미적용 전체 실거래가 산점도';
+      // 바 차트
+      const openYMD = openDate;
+
+      const openYear = openYMD ? parseInt(openYMD.slice(0,4)) : null;
+      const before = openYear ? allDeals.filter(d=>parseInt(d.dealDate.slice(0,4))>=openYear-BAR_YEAR && parseInt(d.dealDate.slice(0,8))<parseInt(openYMD)) : [];
+      const after = openYear ? allDeals.filter(d=>parseInt(d.dealDate.slice(0,4))<=openYear+BAR_YEAR && parseInt(d.dealDate.slice(0,8))>=parseInt(openYMD)) : [];
+      const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+      const avgBefore = avg(before.map(d=>parseInt(d.dealAmount.replace(/,/g,''))));
+      const avgAfter = avg(after.map(d=>parseInt(d.dealAmount.replace(/,/g,''))));
+      if (barChartAllObj) barChartAllObj.destroy();
+      barChartAllObj = new Chart(document.getElementById('barChartAll'), {
+        type: 'bar',
+        data: {
+          labels: [`개통 전 ${BAR_YEAR}년`, `개통 후 ${BAR_YEAR}년`],
+          datasets: [{label: '평균 거래금액(만원)', data: [avgBefore, avgAfter], backgroundColor: ['#ccc', '#ffb84a']}]
+        },
+        options: {responsive: false, plugins: {legend: {display: false}}}
+      });
+      document.getElementById('barTitleAll').innerText = '필터 미적용 전체 평균 실거래가';
+      let percent = avgBefore ? ((avgAfter-avgBefore)/avgBefore*100).toFixed(1) : 'N/A';
+      document.getElementById('barInfoAll').innerHTML = `<span class="bar-label">전체 개통 전후 ${BAR_YEAR}년 평균 증감률:</span> <span class="percent">${percent}%</span>`;
+      console.log('[renderAllDealsCharts] rendered. allDeals.length:', allDeals.length);
+    }
+  </script>
+</body>
+</html>

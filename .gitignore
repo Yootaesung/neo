@@ -1,0 +1,46 @@
+# .env & secrets
+.env
+secret.json
+
+# Build artifacts
+**/*.o
+**/*.class
+**/__pycache__/
+**/*.mp4
+**/*.mp3
+**/model.safetensors
+**/*.gguf
+**/sft.json
+**/finetuned-*
+**/finetuning-*
+
+# C program
+!c/
+!c/**/*.c
+!c/**/Makefile*
+!c/**/lib/
+!c/**/lib/*.a
+!c/**/lib/*.h
+
+# Java & Scala
+scala/**/project
+scala/**/target
+
+# Python
+.idea
+**/.venv
+
+# Node.js
+node/**/node_modules
+node/**/package-lock.json
+node/**/serverlesssecret.json  # ← 오타 수정
+
+# Oracle & Mongo
+oracle/**/node_modules
+oracle/**/package-lock.json
+oracle/node/dbConfig.js
+mongodb/backup
+
+# Docker
+docker/mysql/mysql*
+docker/mongodb/mongo*

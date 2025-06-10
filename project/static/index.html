@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>아파트 실거래가 조회</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            font-size: 1rem;
+            margin-right: 10px;
+        }
+        button {
+            cursor: pointer;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .results {
+            margin-top: 20px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .item {
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .item:last-child {
+            border-bottom: none;
+        }
+        
+    </style>
+</head>
+<body>
+    <h1>아파트 실거래가 조회</h1>
+
+    <!-- 법정동 검색 -->
+    <div class="section">
+        <h2>법정동 검색</h2>
+        <div class="search-container">
+            <input
+                type="text"
+                id="dongInput"
+                placeholder="법정동명을 입력하세요"
+                onkeypress="if(event.key === 'Enter') document.getElementById('dongSearchBtn').click();"
+            />
+            <button id="dongSearchBtn" onclick="searchDong()">검색</button>
+            <button id="toggleDongBtn" onclick="toggleDongResults()" style="display: none;">▼ 검색 결과 보기</button>
+        </div>
+        <div id="dongResultsWrapper" style="margin-top: 10px;">
+            <div id="dongResults" class="results" style="display: none; border: 1px solid #ccc; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- 자동입력용 법정동코드 필드 -->
+    <div class="section">
+        <label for="bubjungdongCode">법정동코드:</label>
+        <input type="text" id="bubjungdongCode" readonly>
+    </div>
+
+    <!-- 지하철 검색 -->
+    <div class="section">
+        <h2>지하철 검색</h2>
+        <div class="search-container">
+            <input
+                type="text"
+                id="subwayInput"
+                placeholder="지하철역명 또는 지역명을 입력하세요"
+                onkeypress="if(event.key === 'Enter') document.getElementById('subwaySearchBtn').click();"
+            />
+            <button id="subwaySearchBtn" onclick="searchSubway()">검색</button>
+            <button id="toggleSubwayBtn" onclick="toggleSubwayResults()" style="display: none;">▼ 검색 결과 보기</button>
+        </div>
+        <div id="subwayResultsWrapper" style="margin-top: 10px;">
+            <div id="subwayResults" class="results" style="display: none; border: 1px solid #ccc; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- 자동입력용 개통일 필드 -->
+    <div class="section">
+        <label for="subwayOpenDateInputForSearch">개통일:</label>
+        <input type="text" id="subwayOpenDateAutoFill" readonly>
+    </div>
+
+    <!-- 아파트 검색 -->
+    <div class="section">
+        <h2>아파트 검색</h2>
+        <div class="search-container">
+            <input
+                type="text"
+                id="apartmentNameInput"
+                placeholder="아파트명을 입력하세요"
+                onkeypress="if(event.key === 'Enter') document.getElementById('apartmentSearchBtn').click();"
+            />
+            <button id="apartmentSearchBtn" onclick="searchApartment()">검색</button>
+            <button id="toggleApartmentBtn" onclick="toggleApartmentResults()" style="display: none;">▼ 검색 결과 보기</button>
+        </div>
+        <div id="apartmentResultsWrapper" style="margin-top: 10px;">
+            <div id="apartmentResults" class="results" style="display: none; border: 1px solid #ccc; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- 자동입력용 아파트명 필드 -->
+    <div class="section">
+        <label for="apartmentName">아파트명:</label>
+        <input type="text" id="apartmentName" readonly>
+    </div>
+
+<!-- 전용면적 검색 -->
+<div class="section">
+    <h2>전용면적 검색</h2>
+    <div class="search-container">
+        <input type="text" id="areaCodeInput" placeholder="법정동코드 (예: 11680)">
+        <input type="text" id="areaDateInput" placeholder="지하철 개통일 (예: 20250421)">
+        <input type="text" id="areaAptInput" placeholder="아파트명">
+        <button onclick="searchExclusiveArea()">검색</button>
+
+        <!-- 로딩 메시지 -->
+        <div id="exclusiveAreaLoading" style="display: none; font-weight: bold; margin-top: 10px;">
+            🔍 전용면적 정보를 불러오는 중입니다...
+        </div>
+
+        <!-- 검색 결과 보기 버튼 -->
+        <button id="toggleAreaResultsButton" onclick="toggleAreaResults()" style="display: none; margin-top: 10px;">
+            검색 결과 보기
+        </button>
+
+        <!-- 결과 테이블 -->
+        <table id="exclusiveAreaTable" style="display: none; width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr>
+                    <th style="border-bottom: 1px solid #ccc; text-align: left; padding: 8px;">전용면적</th>
+                    <th style="border-bottom: 1px solid #ccc; text-align: left; padding: 8px;">거래 횟수</th>
+                </tr>
+            </thead>
+            <tbody id="exclusiveAreaBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 자동입력용 전용면적 필드 -->
+    <div class="section">
+        <label for="exclusiveArea">전용면적:</label>
+        <input type="text" id="exclusiveArea" readonly>
+    </div>
+
+
+    <script>
+        // 법정동 검색
+        let lastSelectedDongCode = "";
+
+        async function searchDong() {
+            const dong = document.getElementById("dongInput").value.trim();
+            const resultsDiv = document.getElementById("dongResults");
+            const toggleBtn = document.getElementById("toggleDongBtn");
+
+            resultsDiv.innerHTML = "";
+            if (!dong) {
+                resultsDiv.innerHTML = "법정동명을 입력해주세요.";
+                resultsDiv.style.display = "block";
+                toggleBtn.style.display = "block";
+                toggleBtn.textContent = "▲ 검색 결과 닫기";
+                return;
+            }
+
+            resultsDiv.innerHTML = "검색 중...";
+            resultsDiv.style.display = "block";
+            toggleBtn.style.display = "block";
+            toggleBtn.textContent = "▲ 검색 결과 닫기";
+
+            try {
+                const response = await fetch(`/bubjungdong/getbubjungdong?dong=${encodeURIComponent(dong)}`);
+                const data = await response.json();
+
+                if (data.result && data.resultCount > 0) {
+                    resultsDiv.innerHTML = `<p><strong>검색결과 (${data.resultCount}건)</strong></p>`;
+                    data.results.forEach(item => {
+                        const div = document.createElement("div");
+                        div.className = "dong-result-item";
+                        div.innerHTML = `<strong>${item.bubjungdongName}</strong> (${item.bubjungdongCode})<br>폐지여부: ${item.exitOrNot}`;
+                        div.onclick = () => selectDongCode(item.bubjungdongCode);
+                        resultsDiv.appendChild(div);
+                    });
+                } else {
+                    resultsDiv.innerHTML = "검색 결과가 없습니다.";
+                }
+            } catch (error) {
+                console.error(error);
+                resultsDiv.innerHTML = "검색 중 오류가 발생했습니다.";
+            }
+        }
+
+        function selectDongCode(code) {
+            lastSelectedDongCode = code;
+            document.getElementById("bubjungdongCode").value = code;
+
+            // 2. 아파트 검색 입력창에도 자동 입력
+            document.getElementById("apartmentCodeInput").value = code;
+            // ✅ 선택 후 결과창 닫기
+            document.getElementById("dongResults").style.display = "none";
+            document.getElementById("toggleDongBtn").textContent = "▼ 검색 결과 보기";
+        }
+
+        function toggleDongResults() {
+            const results = document.getElementById("dongResults");
+            const toggleBtn = document.getElementById("toggleDongBtn");
+
+            if (results.style.display === "none") {
+                results.style.display = "block";
+                toggleBtn.textContent = "▲ 검색 결과 닫기";
+            } else {
+                results.style.display = "none";
+                toggleBtn.textContent = "▼ 검색 결과 보기";
+        }
+        }
+
+        // 지하철 검색
+        async function searchSubway() {
+            const query = document.getElementById("subwayInput").value.trim();
+            const resultsDiv = document.getElementById("subwayResults");
+            const toggleBtn = document.getElementById("toggleSubwayBtn");
+
+            // 검색 중 메시지를 표시하고 결과를 보이도록 설정
+            resultsDiv.innerHTML = "검색 중...";
+            resultsDiv.style.display = "block";  // 검색 후 결과가 보이게 설정
+            toggleBtn.style.display = "block";  // 결과 보기 버튼 표시
+
+            try {
+                const response = await fetch(`/subway/getsubway?station=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.result && data.resultCount > 0) {
+                    resultsDiv.innerHTML = `<p><strong>검색결과 (${data.resultCount}건)</strong></p>`;
+                    data.results.forEach(item => {
+                        const stationDiv = document.createElement("div");
+                        stationDiv.className = "subway-result-item";
+                        stationDiv.style.cursor = "pointer";
+                        stationDiv.innerHTML = `
+                            <strong>${item.stationName}</strong><br>
+                            위치: ${item.location}<br>
+                            개통일: ${item.openDate || "정보 없음"}
+                        `;
+                        stationDiv.onclick = () => {
+                            if (item.openDate) {
+                                // 지하철 개통일이 존재하면 아파트 검색칸에 자동으로 입력
+                                document.getElementById("subwayOpenDateAutoFill").value = item.openDate;
+                                document.getElementById("subwayOpenDateInputForSearch").value = item.openDate;
+                            }
+                            // 결과창 숨기기
+                            resultsDiv.style.display = "none";
+                            toggleBtn.textContent = "▼ 검색 결과 보기";
+                            toggleBtn.style.display = "block";
+                        };
+                        resultsDiv.appendChild(stationDiv);
+                    });
+                } else {
+                    resultsDiv.innerHTML = data.message || "검색 결과가 없습니다.";
+                }
+            } catch (error) {
+                console.error(error);
+                resultsDiv.innerHTML = "검색 중 오류가 발생했습니다.";
+            }
+        }
+
+        // 지하철 검색 결과 보기 / 닫기 토글 기능
+        function toggleSubwayResults() {
+            const results = document.getElementById("subwayResults");
+            const toggleBtn = document.getElementById("toggleSubwayBtn");
+
+            // 결과창이 안 보이면 펼치고, 보이면 닫기
+            if (results.style.display === "none") {
+                results.style.display = "block";
+                toggleBtn.textContent = "▲ 검색 결과 닫기";
+            } else {
+                results.style.display = "none";
+                toggleBtn.textContent = "▼ 검색 결과 보기";
+            }
+        }
+
+        // 아파트 검색
+        async function searchApartment() {
+            const aptName = document.getElementById("apartmentNameInput").value.trim();
+            const dongCode = document.getElementById("bubjungdongCode").value.trim();
+            const openDate = document.getElementById("subwayOpenDateAutoFill").value.trim();
+            const resultsDiv = document.getElementById("apartmentResults");
+            const toggleBtn = document.getElementById("toggleApartmentBtn");
+
+            resultsDiv.innerHTML = "";
+            resultsDiv.style.display = "block";
+            toggleBtn.style.display = "block";
+            toggleBtn.textContent = "▲ 검색 결과 닫기";
+
+            if (!aptName || !dongCode || !openDate) {
+                resultsDiv.innerHTML = "모든 정보를 입력해주세요. (법정동코드, 아파트명, 개통일)";
+                return;
+            }
+
+            try {
+                const query = `/getaptdeal?bubjungdongCode=${encodeURIComponent(dongCode)}&aptName=${encodeURIComponent(aptName)}&openDate=${encodeURIComponent(openDate)}`;
+                const response = await fetch(query);
+                const data = await response.json();
+
+                if (data.result && data.result.length > 0) {
+                    // 거래횟수 계산
+                    const countMap = new Map();
+                    data.result.forEach(item => {
+                        const apt = item.아파트명;
+                        countMap.set(apt, (countMap.get(apt) || 0) + 1);
+                    });
+
+                    resultsDiv.innerHTML = `<p><strong>검색결과 (${countMap.size}건)</strong></p>`;
+                    for (const [apt, count] of countMap.entries()) {
+                        const div = document.createElement("div");
+                        div.className = "apartment-result-item";
+                        div.innerHTML = `${apt} - 거래 ${count}건`;
+                        resultsDiv.appendChild(div);
+                    }
+                } else {
+                    resultsDiv.innerHTML = "검색 결과가 없습니다.";
+                }
+            } catch (error) {
+                console.error(error);
+                resultsDiv.innerHTML = "검색 중 오류가 발생했습니다.";
+            }
+        }
+
+        function toggleApartmentResults() {
+            const results = document.getElementById("apartmentResults");
+            const toggleBtn = document.getElementById("toggleApartmentBtn");
+
+            if (results.style.display === "none") {
+                results.style.display = "block";
+                toggleBtn.textContent = "▲ 검색 결과 닫기";
+            } else {
+                results.style.display = "none";
+                toggleBtn.textContent = "▼ 검색 결과 보기";
+            }
+        }
+
+        // 전용면적 검색
+        async function searchExclusiveArea() {
+            const code = document.getElementById("areaCodeInput").value.trim();
+            const date = document.getElementById("areaDateInput").value.trim();
+            const aptName = document.getElementById("areaAptInput").value.trim();
+
+            if (!code || !date || !aptName) {
+                alert("법정동코드, 개통일, 아파트명을 모두 입력하세요.");
+                return;
+            }
+
+            const loading = document.getElementById("exclusiveAreaLoading");
+            const table = document.getElementById("exclusiveAreaTable");
+            const body = document.getElementById("exclusiveAreaBody");
+            const toggleBtn = document.getElementById("toggleAreaResultsButton");
+
+            loading.style.display = "block";
+            table.style.display = "none";
+            body.innerHTML = "";
+
+            try {
+                const res = await fetch(`http://192.168.1.42:5000/getexcluusear?bubjungdongCode=${code}&openDate=${date}&apartmentName=${encodeURIComponent(aptName)}`);
+                const data = await res.json();
+                loading.style.display = "none";
+
+                if (data.result && data.resultCount > 0) {
+                    data.results.forEach(item => {
+                        const row = document.createElement("tr");
+
+                        const areaCell = document.createElement("td");
+                        areaCell.textContent = item.area;
+                        areaCell.style.padding = "8px";
+                        areaCell.style.cursor = "pointer";
+
+                        const countCell = document.createElement("td");
+                        countCell.textContent = item.tradeCount;
+                        countCell.style.padding = "8px";
+
+                        row.appendChild(areaCell);
+                        row.appendChild(countCell);
+
+                        // 클릭 시 전용면적 자동입력
+                        areaCell.onclick = function () {
+                            document.getElementById("exclusiveArea").value = item.area;
+                            table.style.display = "none";
+                            toggleBtn.textContent = "▼ 검색 결과 보기";
+                        };
+
+                        body.appendChild(row);
+                    });
+
+                    table.style.display = "table";
+                    toggleBtn.style.display = "inline-block";
+                    toggleBtn.textContent = "▲ 검색 결과 닫기";
+                } else {
+                    const row = document.createElement("tr");
+                    const cell = document.createElement("td");
+                    cell.colSpan = 2;
+                    cell.textContent = data.message || "검색 결과가 없습니다.";
+                    cell.style.color = "red";
+                    cell.style.padding = "8px";
+                    row.appendChild(cell);
+                    body.appendChild(row);
+                    table.style.display = "table";
+                    toggleBtn.style.display = "inline-block";
+                    toggleBtn.textContent = "▲ 검색 결과 닫기";
+                }
+            } catch (err) {
+                loading.style.display = "none";
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 2;
+                cell.textContent = "오류 발생: " + err.message;
+                cell.style.color = "red";
+                cell.style.padding = "8px";
+                row.appendChild(cell);
+                body.appendChild(row);
+                table.style.display = "table";
+                toggleBtn.style.display = "inline-block";
+                toggleBtn.textContent = "▲ 검색 결과 닫기";
+            }
+        }
+
+        // 전용면적 검색 결과 토글 기능
+        function toggleAreaResults() {
+            const table = document.getElementById("exclusiveAreaTable");
+            const toggleBtn = document.getElementById("toggleAreaResultsButton");
+            if (table.style.display === "none") {
+                table.style.display = "table";
+                toggleBtn.textContent = "▲ 검색 결과 닫기";
+            } else {
+                table.style.display = "none";
+                toggleBtn.textContent = "▼ 검색 결과 보기";
+            }
+        }
+    </script>
+
+    <style>
+        .dong-result-item {
+        padding: 6px 10px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        }
+        .dong-result-item:hover {
+        background-color: #f0f8ff;
+        }
+    </style>
+
+    <style>
+        .subway-result-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .subway-result-item:hover {
+            background-color: #f0f8ff;
+        }
+    </style>
+
+    <style>
+        .apartment-result-item {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+    
+        .apartment-result-item:hover {
+            background-color: #f0f8ff;
+        }
+    </style>
+
+    <style>
+        .exclusive-result-item {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .exclusive-result-item:hover {
+            background-color: #f0f8ff;
+        }
+    </style>
+</body>
+</html>
